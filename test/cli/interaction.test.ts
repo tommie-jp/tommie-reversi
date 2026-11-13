@@ -129,6 +129,15 @@ describe("Interaction", () => {
         expect(handlers.onQuit).toHaveBeenCalledTimes(1);
     });
 
+    it("does not show the move prompt again after a confirmed quit", () => {
+        const { interaction, text } = setup();
+        interaction.setInGame(true);
+        void interaction.requestMove(newGame(), "PROMPT> ");
+        interaction.handleLine("quit");
+        interaction.handleLine("y");
+        expect(text().split("PROMPT> ")).toHaveLength(2);
+    });
+
     it("asks before abandoning a game for a new one", () => {
         const { interaction, handlers } = setup();
         interaction.setInGame(true);

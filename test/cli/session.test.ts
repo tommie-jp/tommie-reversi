@@ -161,6 +161,70 @@ describe("Session", () => {
         expect(games).toBe(2);
     });
 
+    it("puts RUP lines sent before the first game into the first game's log", async () => {
+        const { session, files } = harness([], () => ({
+            black: new ScriptedPlayer("b", [{ kind: "resign" }]),
+            white: new ScriptedPlayer("w", []),
+            humans: [],
+        }));
+        session.logRup("TX", "PI");
+        session.logRup("RX", "+PI");
+        const running = session.run();
+        await tick();
+        session.interaction.handleLine("quit");
+        await running;
+        expect(files[0]!.rupLines).toEqual(["TX PI", "RX +PI"]);
+    });
+
+    it("says whom it is waiting for when a person plays a CPU", async () => {
+        const { session, text } = harness([], (_n, s) => ({
+            black: new ScriptedPlayer("fpga", [move("f5"), { kind: "resign" }]),
+            white: new HumanPlayer("you", s.interaction, () => s.timeLeftMs(), true),
+            humans: [2],
+        }));
+        const running = session.run();
+        await tick();
+        expect(text()).toContain("waiting for Black (fpga)...");
+        expect(text()).toContain("Black: f5");
+        expect(text()).toContain("White (you) to move. (60s) > ");
+        session.interaction.handleLine("d6");
+        await tick();
+        session.interaction.handleLine("quit");
+        expect(await running).toBe(EXIT.ok);
+    });
+
+    it("keeps playing unattended games when the input ends", async () => {
+        const { session, files } = harness(
+            ["--port", "/dev/x", "--opponent", "random", "--games", "2", "--seed", "1"],
+            (n) => ({ black: new RandomPlayer("b", seededRandom(n)), white: new RandomPlayer("w", seededRandom(n + 7)), humans: [] }),
+        );
+        session.endOfInput();
+        expect(await session.run()).toBe(EXIT.ok);
+        expect(files).toHaveLength(2);
+    });
+
+    it("sums up unattended games at the end", async () => {
+        const { session, text } = harness(
+            ["--port", "/dev/x", "--opponent", "random", "--games", "4", "--seed", "1"],
+            (n) => ({
+                black: new RandomPlayer("b", seededRandom(n)),
+                white: new RandomPlayer("w", seededRandom(n + 100)),
+                humans: [],
+            }),
+        );
+        await session.run();
+        expect(text()).toMatch(/Played 4 games: black won \d+, white won \d+, drawn \d+\./);
+    });
+
+    it("names the stopped game in the summary", async () => {
+        const { session, text } = harness(
+            ["--port", "/dev/x", "--opponent", "random", "--games", "3"],
+            () => ({ black: new ScriptedPlayer("cpu", [move("a1")]), white: new ScriptedPlayer("r", []), humans: [] }),
+        );
+        await session.run();
+        expect(text()).toContain("Played 1 game: stopped at game 1 (violation).");
+    });
+
     it("shows the board again on request and logs RUP lines to the current game", async () => {
         const { session, files, text } = harness([], (_n, s) => ({
             black: new HumanPlayer("Black", s.interaction, () => s.timeLeftMs(), false),

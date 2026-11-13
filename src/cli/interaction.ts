@@ -72,8 +72,8 @@ export class Interaction {
         if (this.confirming !== null) {
             const action = this.confirming;
             this.confirming = null;
-            if (YES.has(line.trim().toLowerCase())) action();
-            else this.write("Cancelled.\n");
+            if (YES.has(line.trim().toLowerCase())) return action();
+            this.write("Cancelled.\n");
             this.reprompt();
             return;
         }

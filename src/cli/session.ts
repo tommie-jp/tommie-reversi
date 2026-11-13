@@ -47,6 +47,10 @@ export class Session {
     private afterGame: ((step: NextStep) => void) | null = null;
     private stopReason: "new" | "quit" | "interrupted" | null = null;
     private quitWhenIdle = false;
+    private seats: Seats | null = null;
+    /** RUP lines logged before the first game's files exist (the PI/VE of connecting). */
+    private earlyRup: { direction: Direction; line: string; date: Date }[] = [];
+    private readonly tally = { black: 0, white: 0, draw: 0 };
 
     constructor(
         private readonly options: PlayOptions,
@@ -68,7 +72,8 @@ export class Session {
 
     /** Sends a RUP line to the log of the current game. */
     logRup(direction: Direction, line: string): void {
-        this.files?.rup(direction, line, this.deps.now());
+        if (this.files === null) this.earlyRup.push({ direction, line, date: this.deps.now() });
+        else this.files.rup(direction, line, this.deps.now());
     }
 
     /** Ctrl+C. */
@@ -76,15 +81,18 @@ export class Session {
         this.stop("interrupted");
     }
 
-    /** Ctrl+D or the end of the input. Moves typed or piped in before it are played first. */
+    /**
+     * Ctrl+D or the end of the input. Moves typed or piped in before it are played first.
+     * Unattended games (no person playing) go on, so they can run with no input at all.
+     */
     endOfInput(): void {
+        if (this.options.opponent === "random") return;
         if (!this.interaction.hasEarlyInput()) return this.stop("quit");
         this.quitWhenIdle = true;
         this.interaction.onIdle(() => this.stop("quit"));
     }
 
     async run(): Promise<number> {
-        let stoppedGames = 0;
         for (let gameNumber = 1; ; gameNumber++) {
             const result = await this.playOne(gameNumber);
             if (this.stopReason === "interrupted") return EXIT.interrupted;
@@ -93,12 +101,12 @@ export class Session {
                 this.stopReason = null;
                 continue;
             }
-            if (result.reason !== "normal") stoppedGames++;
-            const unattended = this.options.opponent === "random";
-            if (unattended) {
-                if (result.reason !== "normal" && result.reason !== "resign") return EXIT.stopped;
-                if (gameNumber >= this.options.games) return stoppedGames > 0 ? EXIT.stopped : EXIT.ok;
-                continue;
+            if (result.reason === "normal") this.tally[result.outcome]++;
+            if (this.options.opponent === "random") {
+                const stopped = result.reason !== "normal" && result.reason !== "resign";
+                if (!stopped && gameNumber < this.options.games) continue;
+                this.writeSummary(gameNumber, stopped ? result.reason : null);
+                return stopped ? EXIT.stopped : EXIT.ok;
             }
             if ((await this.waitAfterGame()) === "quit") return EXIT.ok;
         }
@@ -107,7 +115,9 @@ export class Session {
     private async playOne(gameNumber: number): Promise<MatchResult> {
         const started = this.deps.now();
         this.files = this.deps.openFiles(fileStem(started, gameNumber));
+        for (const early of this.earlyRup.splice(0)) this.files.rup(early.direction, early.line, early.date);
         const seats = this.deps.seats(gameNumber, this);
+        this.seats = seats;
         this.humans = seats.humans;
         this.controller = new AbortController();
         this.interaction.setInGame(true);
@@ -164,6 +174,21 @@ export class Session {
             this.options.color,
         );
         this.deps.write(`\n${board}\n${status}\n`);
+        const waitingFor = this.state.status === "playing" && this.humans.length > 0 && !this.humans.includes(this.state.turn);
+        if (waitingFor && this.seats !== null) {
+            const name = this.state.turn === BLACK ? this.seats.black.name : this.seats.white.name;
+            this.deps.write(`waiting for ${colorName(this.state.turn)} (${name})...\n`);
+        }
+    }
+
+    private writeSummary(played: number, stoppedReason: string | null): void {
+        const games = `Played ${played} game${played === 1 ? "" : "s"}`;
+        if (stoppedReason !== null) {
+            this.deps.write(`${games}: stopped at game ${played} (${stoppedReason}).\n`);
+            return;
+        }
+        const { black, white, draw } = this.tally;
+        this.deps.write(`${games}: black won ${black}, white won ${white}, drawn ${draw}.\n`);
     }
 
     private saveRecord(started: Date, seats: Seats, result: MatchResult): void {
