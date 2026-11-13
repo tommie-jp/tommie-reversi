@@ -33,6 +33,23 @@ export interface Messages {
     readonly waitingFor: (name: string) => string;
     readonly confirmNewGame: string;
     readonly gameError: (error: GameError, square: string) => string;
+    readonly records: string;
+    readonly settings: string;
+    readonly close: string;
+    readonly save: string;
+    readonly copy: string;
+    readonly copied: string;
+    readonly download: string;
+    readonly share: string;
+    readonly noGames: string;
+    readonly playing: string;
+    readonly clockSeconds: string;
+    readonly sound: string;
+    readonly hints: string;
+    readonly confirmMoveSetting: string;
+    readonly language: string;
+    readonly languageAuto: string;
+    readonly saveFailed: string;
     readonly result: (result: MatchResult, counts: Counts) => string;
 }
 
@@ -48,6 +65,23 @@ const ja: Messages = {
     confirmMove: (square) => `${square} に打ちます。もう一度押すと決まります`,
     waitingFor: (name) => `${name} の手を待っています…`,
     confirmNewGame: "今の対局をやめて、新しく始めますか？",
+    records: "棋譜",
+    settings: "設定",
+    close: "閉じる",
+    save: "保存",
+    copy: "コピー",
+    copied: "コピーしました",
+    download: "ファイルに保存",
+    share: "共有",
+    noGames: "保存した対局はありません",
+    playing: "対局中",
+    clockSeconds: "時計の秒数 (1 手)",
+    sound: "音を出す",
+    hints: "置ける所に印を付ける",
+    confirmMoveSetting: "CPU に送る前に、もう一度押して確かめる",
+    language: "言葉",
+    languageAuto: "ブラウザに合わせる",
+    saveFailed: "このブラウザには保存できません (プライベートモードなど)",
     gameError: (error, square) => {
         switch (error) {
             case "no-flips": return `${square} は 1 つも返せません`;
@@ -89,6 +123,23 @@ const en: Messages = {
     confirmMove: (square) => `Play ${square}? Tap it again to confirm`,
     waitingFor: (name) => `Waiting for ${name}...`,
     confirmNewGame: "Stop this game and start a new one?",
+    records: "Records",
+    settings: "Settings",
+    close: "Close",
+    save: "Save",
+    copy: "Copy",
+    copied: "Copied",
+    download: "Save as file",
+    share: "Share",
+    noGames: "No saved games",
+    playing: "In progress",
+    clockSeconds: "Clock seconds (per move)",
+    sound: "Sound",
+    hints: "Mark the legal squares",
+    confirmMoveSetting: "Tap twice before a move goes to the CPU",
+    language: "Language",
+    languageAuto: "Same as the browser",
+    saveFailed: "This browser cannot save (private mode?)",
     gameError: (error, square) => {
         switch (error) {
             case "no-flips": return `${square} does not flip any disc`;

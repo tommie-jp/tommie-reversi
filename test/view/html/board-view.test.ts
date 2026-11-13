@@ -15,6 +15,8 @@ function snapshot(state: GameState, extra: Partial<Snapshot> = {}): Snapshot {
         markedSquare: null,
         result: null,
         notice: null,
+        gameNumber: 1,
+        startedAtMs: 0,
         ...extra,
     };
 }

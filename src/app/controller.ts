@@ -30,6 +30,10 @@ export interface Snapshot {
     readonly markedSquare: string | null;
     readonly result: MatchResult | null;
     readonly notice: Notice;
+    /** 1 for the first game since the page opened, then 2, 3, ... */
+    readonly gameNumber: number;
+    /** When this game started (from `now`). */
+    readonly startedAtMs: number;
 }
 
 export interface ControllerOptions {
@@ -45,6 +49,8 @@ export class GameController {
     private result: MatchResult | null = null;
     private notice: Notice = null;
     private controller: AbortController | null = null;
+    private gameNumber = 0;
+    private startedAtMs = 0;
 
     constructor(private readonly options: ControllerOptions) {
         this.clock = newClock(options.clockLimitMs);
@@ -56,6 +62,8 @@ export class GameController {
         const controller = new AbortController();
         this.controller = controller;
         this.seats = seats;
+        this.gameNumber++;
+        this.startedAtMs = this.options.now();
         this.state = newGame();
         this.result = null;
         this.notice = null;
@@ -92,6 +100,15 @@ export class GameController {
         return result;
     }
 
+    /** Takes effect from the next turn. */
+    setClockLimit(limitMs: number): void {
+        this.clock = { ...newClock(limitMs), running: this.clock.running, startedAtMs: this.clock.startedAtMs };
+    }
+
+    clockLimitMs(): number {
+        return this.clock.limitMs;
+    }
+
     timeLeftMs(): { readonly black: number; readonly white: number } {
         const now = this.options.now();
         return { black: remainingMs(this.clock, BLACK, now), white: remainingMs(this.clock, WHITE, now) };
@@ -108,6 +125,8 @@ export class GameController {
             markedSquare: player?.pendingSquare ?? null,
             result: this.result,
             notice: this.notice,
+            gameNumber: this.gameNumber,
+            startedAtMs: this.startedAtMs,
         };
     }
 

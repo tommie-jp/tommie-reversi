@@ -5,7 +5,7 @@
     "lib": ["ES2022"],
     "types": ["node"]
   },
-  "include": ["src/core", "src/cli", "src/transport", "src/view/terminal", "test", "vitest.config.ts"],
+  "include": ["src/core", "src/cli", "src/transport", "src/view/terminal", "test", "vitest.config.ts", "vite.config.ts"],
   // Browser code and its tests are checked by tsconfig.web-test.json.
   "exclude": ["test/app", "test/view/html", "src/transport/web-serial.ts"]
 }

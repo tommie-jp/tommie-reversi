@@ -112,6 +112,32 @@ describe("GameController", () => {
         expect(first.white.waiting).toBe(false);
     });
 
+    it("numbers the games and remembers when each started", async () => {
+        const { controller, last, advance } = setup();
+        advance(1_000);
+        controller.start(people().seats);
+        await tick();
+        expect(last().gameNumber).toBe(1);
+        expect(last().startedAtMs).toBe(1_000);
+        advance(5_000);
+        controller.start(people().seats);
+        await tick();
+        expect(last().gameNumber).toBe(2);
+        expect(last().startedAtMs).toBe(6_000);
+    });
+
+    it("uses a new clock limit from the next turn", async () => {
+        const { controller, advance } = setup();
+        controller.start(people().seats);
+        await tick();
+        controller.setClockLimit(30_000);
+        controller.tap("f5");
+        await tick();
+        advance(1_000);
+        expect(controller.timeLeftMs()).toEqual({ black: 30_000, white: 29_000 });
+        expect(controller.clockLimitMs()).toBe(30_000);
+    });
+
     it("can be stopped", async () => {
         const { controller, last } = setup();
         controller.start(people().seats);

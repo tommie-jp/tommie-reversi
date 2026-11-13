@@ -5,6 +5,8 @@
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+export { isoLocal, recordText, type RecordFields } from "../core/record-file";
+
 export type Direction = "TX" | "RX";
 
 const pad = (value: number, width = 2) => String(value).padStart(width, "0");
@@ -18,39 +20,6 @@ export function fileStem(date: Date, gameNumber: number): string {
     const day = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`;
     const time = `${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
     return `${day}-${time}-${pad(gameNumber)}`;
-}
-
-/** Local time with its UTC offset, e.g. 2026-11-17T15:30:12+09:00. */
-export function isoLocal(date: Date): string {
-    const offset = -date.getTimezoneOffset();
-    const sign = offset >= 0 ? "+" : "-";
-    const abs = Math.abs(offset);
-    return (
-        `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-        `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}` +
-        `${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`
-    );
-}
-
-export interface RecordFields {
-    readonly date: Date;
-    readonly black: string;
-    readonly white: string;
-    readonly result: string;
-    /** The record line, e.g. "f5d6c3". */
-    readonly record: string;
-}
-
-export function recordText(fields: RecordFields): string {
-    const oneLine = (text: string) => text.replace(/[\r\n]+/g, " ");
-    return [
-        `# date: ${isoLocal(fields.date)}`,
-        `# black: ${oneLine(fields.black)}`,
-        `# white: ${oneLine(fields.white)}`,
-        `# result: ${oneLine(fields.result)}`,
-        fields.record,
-        "",
-    ].join("\n");
 }
 
 /** Writes the files of one game. Lines are appended at once so a crash loses nothing. */

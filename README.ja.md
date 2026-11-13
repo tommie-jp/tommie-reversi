@@ -5,7 +5,8 @@
 自作 CPU (FPGA など) と UART でつないで対局するリバーシのアプリです。
 通信には [Reversi UART Protocol (RUP)](https://github.com/tommie-jp/reversi-uart-protocol) を使います。
 
-> 状態: 開発中。ターミナル版 (CLI) は動きます。ブラウザ版はまだありません。
+> 状態: 開発中。ターミナル版 (CLI) は動きます。ブラウザ版は人 対 人で打てます (時計、音、棋譜の保存、設定つき)。
+> Web Serial で CPU とつなぐのは次の段階です。
 
 ## 目標
 

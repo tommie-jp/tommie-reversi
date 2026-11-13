@@ -1,7 +1,7 @@
 {
   "name": "tommie-reversi",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Reversi app for playing against a homebrew CPU over UART (RUP)",
   "license": "MIT",
   "repository": {

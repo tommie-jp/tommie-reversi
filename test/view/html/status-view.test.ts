@@ -17,6 +17,8 @@ function snapshot(state: GameState, extra: Partial<Snapshot> = {}): Snapshot {
         markedSquare: null,
         result: null,
         notice: null,
+        gameNumber: 1,
+        startedAtMs: 0,
         ...extra,
     };
 }
@@ -86,6 +88,23 @@ describe("StatusView", () => {
         expect(passButton().hidden).toBe(false);
         passButton().click();
         expect(handlers.onPass).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows both clocks, with the running side marked and colored by the time left", () => {
+        const { root, view } = setup();
+        view.render(snapshot(newGame()));
+        view.renderClocks({ black: 9_000, white: 60_000 }, 60_000, BLACK);
+        const black = root.querySelector<HTMLElement>(".player.black .clock")!;
+        const white = root.querySelector<HTMLElement>(".player.white .clock")!;
+        expect(black.textContent).toBe("9");
+        expect(white.textContent).toBe("60");
+        expect(black.dataset["level"]).toBe("danger");
+        expect(white.dataset["level"]).toBe("ok");
+        expect(black.classList.contains("running")).toBe(true);
+        expect(white.classList.contains("running")).toBe(false);
+        expect(black.style.getPropertyValue("--fraction")).toBe("0.15");
+        view.renderClocks({ black: 60_000, white: 60_000 }, 60_000, null);
+        expect(black.classList.contains("running")).toBe(false);
     });
 
     it("asks for a new game", () => {

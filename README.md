@@ -5,7 +5,8 @@
 A Reversi app for playing against a homebrew CPU (for example on an FPGA) over UART,
 using the [Reversi UART Protocol (RUP)](https://github.com/tommie-jp/reversi-uart-protocol).
 
-> Status: early development. The terminal version (CLI) works; the browser version is not written yet.
+> Status: early development. The terminal version (CLI) works. The browser version plays person against person
+> (with clocks, sound, saved records and settings); playing a CPU over Web Serial comes next.
 
 ## Goals
 

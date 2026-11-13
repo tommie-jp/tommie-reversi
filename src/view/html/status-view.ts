@@ -2,6 +2,7 @@
 // and the Pass and New game buttons.
 
 import { BLACK, WHITE, countDiscs, type Color } from "../../core/board";
+import { clockFace } from "../../app/clock-display";
 import type { Snapshot } from "../../app/controller";
 import type { Messages } from "../../app/messages";
 import { el } from "./dom";
@@ -15,6 +16,7 @@ interface PlayerRow {
     readonly row: HTMLElement;
     readonly name: HTMLElement;
     readonly count: HTMLElement;
+    readonly clock: HTMLElement;
 }
 
 export class StatusView {
@@ -56,6 +58,17 @@ export class StatusView {
         this.passButton.hidden = !snapshot.mustPass;
     }
 
+    renderClocks(timeLeft: { readonly black: number; readonly white: number }, limitMs: number, running: Color | null): void {
+        for (const color of [BLACK, WHITE] as const) {
+            const face = clockFace(color === BLACK ? timeLeft.black : timeLeft.white, limitMs);
+            const clock = this.players[color].clock;
+            clock.textContent = String(face.seconds);
+            clock.dataset["level"] = face.level;
+            clock.classList.toggle("running", running === color);
+            clock.style.setProperty("--fraction", String(Math.round(face.fraction * 100) / 100));
+        }
+    }
+
     private messageText(snapshot: Snapshot, counts: { black: number; white: number }): string {
         const m = this.messages;
         if (snapshot.result !== null) return m.result(snapshot.result, counts);
@@ -74,8 +87,10 @@ export class StatusView {
         const label = el("span", "color", colorName === "black" ? this.messages.black : this.messages.white);
         const name = el("span", "name");
         const count = el("span", "count");
-        row.append(stone, label, name, count);
+        const clock = el("span", "clock");
+        clock.setAttribute("aria-label", "seconds left");
+        row.append(stone, label, name, count, clock);
         root.append(row);
-        return { row, name, count };
+        return { row, name, count, clock };
     }
 }
