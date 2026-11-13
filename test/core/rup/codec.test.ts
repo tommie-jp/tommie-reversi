@@ -14,6 +14,7 @@ describe("encode", () => {
         [{ type: "EB" }, "EB"],
         [{ type: "EW" }, "EW"],
         [{ type: "ED" }, "ED"],
+        [{ type: "EA" }, "EA"],
         [{ type: "PI" }, "PI"],
         [{ type: "VE" }, "VE"],
         [{ type: "CA" }, "CA"],

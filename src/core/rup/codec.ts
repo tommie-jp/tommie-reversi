@@ -17,6 +17,8 @@ export type RupOut =
     | { readonly type: "EB" }
     | { readonly type: "EW" }
     | { readonly type: "ED" }
+    /** END ABORT (v0.3 draft): the game is stopped with no result. */
+    | { readonly type: "EA" }
     | { readonly type: "PI" }
     | { readonly type: "VE" }
     | { readonly type: "CA" }
@@ -57,7 +59,7 @@ const SIMPLE: Readonly<Record<string, RupIn>> = {
     RS: { type: "RS" },
 };
 const KNOWN_COMMANDS = new Set([
-    "SB", "SW", "MO", "PA", "BO", "EB", "EW", "ED", "VE", "PI", "CA", "EN", "RE", "RS", "BS", "ST", "NC",
+    "SB", "SW", "MO", "PA", "BO", "EB", "EW", "ED", "EA", "VE", "PI", "CA", "EN", "RE", "RS", "BS", "ST", "NC",
 ]);
 
 export function encode(message: RupOut): string {

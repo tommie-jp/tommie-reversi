@@ -31,11 +31,14 @@ function setup() {
 
 describe("RupPlayer.connect", () => {
     it("checks the CPU with PI and VE and takes its name", async () => {
-        const { cpu, player, autoAnswer, received } = setup();
+        const { cpu, player, autoAnswer, received, timers } = setup();
         autoAnswer(cpu, "SW-FPGA-pico2-reversi-03-corner.57");
-        await expect(player.connect()).resolves.toEqual({ name: "SW-FPGA-pico2-reversi-03-corner.57", version: "02" });
+        const connecting = player.connect();
+        await settle();
+        await timers.advance(1_000);
+        await expect(connecting).resolves.toEqual({ name: "SW-FPGA-pico2-reversi-03-corner.57", version: "02" });
         expect(player.name).toBe("SW-FPGA-pico2-reversi-03-corner.57");
-        expect(received).toEqual(["PI", "VE"]);
+        expect(received).toEqual(["PI", "VE", "CA"]);
     });
 
     it("tries PI three times, a second apart, then gives up", async () => {
@@ -48,6 +51,70 @@ describe("RupPlayer.connect", () => {
         expect(received).toEqual(["PI", "PI", "PI"]);
     });
 
+    it("asks for the CPU's commands and uses EA to stop a game when the CPU knows it", async () => {
+        const { cpu, player, received } = setup();
+        cpu.onLine((line) => {
+            if (line === "PI") void cpu.sendLine("+PI");
+            if (line === "VE") void cpu.sendLine("+VE03new");
+            if (line === "CA") void cpu.sendLine("+CA PI VE CA SB SW MO PA EB EW ED EA");
+        });
+        await player.connect();
+        expect(received).toEqual(["PI", "VE", "CA"]);
+        await player.start(BLACK);
+        await player.finish({ reason: "aborted", detail: "new game" });
+        await settle();
+        expect(received.slice(3)).toEqual(["SB", "EA", "PI"]);
+    });
+
+    it("falls back to ED when the CPU does not list EA", async () => {
+        const { cpu, player, received, notices } = setup();
+        cpu.onLine((line) => {
+            if (line === "PI") void cpu.sendLine("+PI");
+            if (line === "VE") void cpu.sendLine("+VE02old");
+            if (line === "CA") void cpu.sendLine("+CA PI VE CA SB SW MO PA EB EW ED");
+        });
+        await player.connect();
+        await player.finish({ reason: "aborted", detail: "quit" });
+        await settle();
+        expect(received.slice(3)).toEqual(["ED", "PI"]);
+        expect(notices).toEqual([]);
+    });
+
+    it("falls back to ED, without a notice, when the CPU rejects or ignores CA", async () => {
+        const rejecting = setup();
+        rejecting.cpu.onLine((line) => {
+            if (line === "PI") void rejecting.cpu.sendLine("+PI");
+            if (line === "VE") void rejecting.cpu.sendLine("+VE02old");
+            if (line === "CA") void rejecting.cpu.sendLine("-01 unknown command");
+        });
+        await rejecting.player.connect();
+        expect(rejecting.notices).toEqual([]);
+
+        const silent = setup();
+        silent.autoAnswer(silent.cpu);
+        const connecting = silent.player.connect();
+        await settle();
+        await silent.timers.advance(1_000);
+        await connecting;
+        await silent.player.finish({ reason: "aborted", detail: "quit" });
+        await settle();
+        expect(silent.received.slice(3)).toEqual(["ED", "PI"]);
+        expect(silent.notices).toEqual([]);
+    });
+
+    it("still ends a normal game with EB, EW or ED when the CPU knows EA", async () => {
+        const { cpu, player, received } = setup();
+        cpu.onLine((line) => {
+            if (line === "PI") void cpu.sendLine("+PI");
+            if (line === "VE") void cpu.sendLine("+VE03new");
+            if (line === "CA") void cpu.sendLine("+CA EA");
+        });
+        await player.connect();
+        await player.finish({ reason: "normal", outcome: "white" });
+        await settle();
+        expect(received.slice(3)).toEqual(["EW", "PI"]);
+    });
+
     it("goes on without a name when VE gets no reply, and says so", async () => {
         const { cpu, player, timers, notices } = setup();
         cpu.onLine((line) => {
@@ -55,7 +122,7 @@ describe("RupPlayer.connect", () => {
         });
         const connecting = player.connect();
         await settle();
-        await timers.advance(1_000);
+        await timers.advance(2_000);
         await expect(connecting).resolves.toEqual({ name: "unknown CPU", version: "" });
         expect(notices).toContain("no reply to VE; going on without a name");
     });
@@ -65,6 +132,7 @@ describe("RupPlayer.connect", () => {
         cpu.onLine((line) => {
             if (line === "PI") void cpu.sendLine("+PI");
             if (line === "VE") void cpu.sendLine("+VE01old");
+            if (line === "CA") void cpu.sendLine("+CA PI VE CA");
         });
         await player.connect();
         expect(notices).toContain("the CPU speaks RUP 01; this app speaks RUP 02 and 03");
@@ -169,7 +237,7 @@ describe("RupPlayer during a game", () => {
         });
         const connecting = player.connect();
         await settle();
-        await timers.advance(1_000);
+        await timers.advance(2_000);
         await expect(connecting).resolves.toEqual({ name: "unknown CPU", version: "" });
         expect(notices[0]).toBe("the CPU answered -01: unknown command");
     });
@@ -369,6 +437,7 @@ describe("RupPlayer during a game", () => {
             cpu.onLine((line) => {
                 if (line === "PI") void cpu.sendLine("+PI");
                 if (line === "VE") void cpu.sendLine(`+VE${version}x`);
+                if (line === "CA") void cpu.sendLine("+CA PI VE CA");
             });
             await player.connect();
             expect(notices).toEqual([]);

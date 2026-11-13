@@ -53,7 +53,7 @@ describe.skipIf(!hasSocat)("openSerial over a socat pair", () => {
         opened.push(host, cpu);
         startFakeCpu(cpu, { name: "fake-on-pty", seed: 2, misbehave: "board-after-move" });
         const player = new RupPlayer({ transport: host, timers: systemTimers, onNotice: () => {} });
-        expect(await player.connect()).toEqual({ name: "fake-on-pty", version: "02" });
+        expect(await player.connect()).toEqual({ name: "fake-on-pty", version: "03" });
         const result = await runMatch({
             black: player,
             white: new RandomPlayer("random", seededRandom(4)),

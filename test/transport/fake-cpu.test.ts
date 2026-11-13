@@ -21,9 +21,23 @@ describe("startFakeCpu", () => {
     it("answers PI, VE and CA", async () => {
         expect(await talk({}, ["PI", "VE", "CA"])).toEqual([
             "+PI",
+            "+VE03fake",
+            "+CA PI VE CA SB SW MO PA BO EB EW ED EA",
+        ]);
+    });
+
+    it("can act as a RUP v0.2 CPU, which does not know EA", async () => {
+        expect(await talk({ version: "02" }, ["VE", "CA", "SW", "EA"])).toEqual([
             "+VE02fake",
             "+CA PI VE CA SB SW MO PA BO EB EW ED",
+            "-01 unknown command",
         ]);
+    });
+
+    it("forgets the game after EA", async () => {
+        const got = await talk({}, ["SW", "MOf5", "EA", "MOd6"]);
+        expect(got).toHaveLength(2);
+        expect(got[1]).toBe("-06 no game");
     });
 
     it("moves first after SB with a legal opening move", async () => {

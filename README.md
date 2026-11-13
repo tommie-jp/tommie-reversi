@@ -32,8 +32,8 @@ A debugging tool that runs on a PC with Node.js 22. Run `npm install` once, then
 - Type a square such as `f5` to play. `pass` (or Enter) passes when you have no legal move.
   `board`, `help`, `new` and `quit` work at any time.
 - The CPU's moves are checked. A rule violation, an error reply (`-NN`) or a lost connection stops the game.
-- It works with RUP v0.2 CPUs and follows the v0.3 draft on the host side: a stopped game ends with `ED`
-  so the CPU goes back to idle, an illegal move is answered with `-05`, and after each game a `PI` / `+PI`
+- It works with RUP v0.2 CPUs and follows the v0.3 draft on the host side: a stopped game ends with `EA`
+  (END ABORT; `ED` for a CPU whose `+CA` reply does not list `EA`) so the CPU goes back to idle, an illegal move is answered with `-05`, and after each game a `PI` / `+PI`
   exchange marks the point before which late moves are dropped.
 - Each game writes a record (`logs/<date>-<time>-<n>.txt`, `f5d6c3...` with no passes) and,
   with a CPU, a RUP log (`.rup.log`, `[HH:MM:SS.mmm] TX/RX line`, the replay format of the RUP tools).

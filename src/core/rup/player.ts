@@ -1,12 +1,13 @@
 // A homebrew CPU on the other end of a transport, speaking RUP, seated as a Player.
 // Works with RUP v0.2 CPUs and follows the v0.3 draft on the host side.
 //
-//   connect()            PI (up to 3 tries, 1 s each), then VE
+//   connect()            PI (up to 3 tries, 1 s each), then VE, then CA (does the CPU know EA?)
 //   start(black/white)   SB / SW, and PI every 3 s from then on
 //   opponentMoved()      MOxx / PA
 //   requestMove()        waits for MOxx / PA / EN
 //   finish()             normal end or resignation: EB / EW / ED
-//                        stopped game: ED, so the CPU goes back to idle (v0.3 draft)
+//                        stopped game: EA (END ABORT, v0.3 draft) so the CPU goes back to
+//                        idle; ED for a CPU that does not list EA in its +CA reply
 //                        the CPU broke the rules: -05 first (v0.3 draft)
 //
 // After the end of a game the host sends PI. Moves that arrive before the CPU's +PI
@@ -55,12 +56,15 @@ export class RupPlayer implements Player {
     private disconnected: Error | null = null;
     /** An error reply from the CPU: fails the current game only. */
     private cpuError: Error | null = null;
-    private replyListener: ((message: RupIn) => void) | null = null;
+    /** Returns true when it has dealt with the message and nothing else should. */
+    private replyListener: ((message: RupIn) => boolean) | null = null;
     private stopPing: (() => void) | null = null;
     private missedPings = 0;
     /** A normal game just ended; a PA arriving before the CPU's next move is a late answer. */
     private latePassPossible = false;
     private color: Color = BLACK;
+    /** The CPU listed EA in its +CA reply. */
+    private knowsAbort = false;
     /** Set after a game ends, until the CPU's +PI: moves arriving meanwhile are stale. */
     private settling: Promise<void> | null = null;
 
@@ -76,6 +80,9 @@ export class RupPlayer implements Player {
         }
         if (!alive) throw new Error(`no reply to PI (${CONNECT_TRIES} tries)`);
         const ve = await this.ask({ type: "VE" }, (m) => m.type === "+VE");
+        // CA is optional in RUP: no answer, or an error answer, means "no EA".
+        const ca = await this.ask({ type: "CA" }, (m) => m.type === "+CA", true);
+        this.knowsAbort = ca !== null && ca.type === "+CA" && ca.commands.includes("EA");
         if (ve === null || ve.type !== "+VE") {
             this.options.onNotice("no reply to VE; going on without a name");
             this.name = "unknown CPU";
@@ -134,7 +141,7 @@ export class RupPlayer implements Player {
             await this.send({ type: "-", code: "05", reason: `illegal move ${tried}` }).catch(() => {});
         }
         this.latePassPossible = result.reason === "normal";
-        await this.send({ type: endLine(result) }).catch(() => {});
+        await this.send({ type: endLine(result, this.knowsAbort) }).catch(() => {});
         this.settling = this.settle();
     }
 
@@ -151,18 +158,23 @@ export class RupPlayer implements Player {
         return this.options.transport.sendLine(encode(message));
     }
 
-    /** Sends a query and waits up to a second for the reply that `matches`. */
-    private ask(message: RupOut, matches: (reply: RupIn) => boolean): Promise<RupIn | null> {
+    /**
+     * Sends a query and waits up to a second for the reply that `matches`.
+     * With `errorIsNo`, an error reply (`-NN`) ends the wait at once as "no", without a notice.
+     */
+    private ask(message: RupOut, matches: (reply: RupIn) => boolean, errorIsNo = false): Promise<RupIn | null> {
         return new Promise((resolve) => {
             const cancel = this.options.timers.set(() => {
                 this.replyListener = null;
                 resolve(null);
             }, REPLY_MS);
             this.replyListener = (reply) => {
-                if (!matches(reply)) return;
+                const refused = errorIsNo && reply.type === "-";
+                if (!refused && !matches(reply)) return false;
                 cancel();
                 this.replyListener = null;
-                resolve(reply);
+                resolve(refused ? null : reply);
+                return refused;
             };
             this.send(message).catch(() => {});
         });
@@ -170,7 +182,7 @@ export class RupPlayer implements Player {
 
     private receive(message: RupIn): void {
         if (message.type === "+PI") this.missedPings = 0;
-        this.replyListener?.(message);
+        if (this.replyListener?.(message) === true) return;
         switch (message.type) {
             case "MO":
             case "PA":
@@ -250,9 +262,12 @@ export class RupPlayer implements Player {
     }
 }
 
-/** The end-of-game line for the CPU. A stopped game ends as a draw: RUP has no "abort" line yet. */
-function endLine(result: MatchResult): "EB" | "EW" | "ED" {
+/**
+ * The end-of-game line for the CPU. A stopped game ends with EA (v0.3 draft); a CPU that
+ * does not know EA gets ED, the end line that names no winner.
+ */
+function endLine(result: MatchResult, knowsAbort: boolean): "EB" | "EW" | "ED" | "EA" {
     if (result.reason === "normal") return ({ black: "EB", white: "EW", draw: "ED" } as const)[result.outcome];
     if (result.reason === "resign") return result.by === BLACK ? "EW" : "EB";
-    return "ED";
+    return knowsAbort ? "EA" : "ED";
 }

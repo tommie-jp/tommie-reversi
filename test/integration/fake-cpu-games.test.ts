@@ -9,9 +9,9 @@ import { createLoopbackPair } from "../../src/transport/loopback";
 import { tapTransport } from "../../src/transport/tap";
 import { ManualTimers } from "../helpers/manual-timers";
 
-async function connectedCpu(misbehave?: Misbehaviour) {
+async function connectedCpu(misbehave?: Misbehaviour, version: "02" | "03" = "03") {
     const [host, cpu] = createLoopbackPair();
-    startFakeCpu(cpu, { name: "fake-cpu", seed: 5, ...(misbehave ? { misbehave } : {}) });
+    startFakeCpu(cpu, { name: "fake-cpu", seed: 5, version, ...(misbehave ? { misbehave } : {}) });
     const lines: string[] = [];
     const timers = new ManualTimers();
     const notices: string[] = [];
@@ -69,7 +69,14 @@ describe("games against the fake RUP CPU", () => {
         const result = await play(player, new RandomPlayer("r", seededRandom(1)));
         expect(result).toMatchObject({ reason: "violation", by: 1, error: "no-flips" });
         // v0.3 draft: the CPU is told about its illegal move, then sent back to idle.
-        expect(lines.filter((l) => /^TX (-05|E[BWD])/.test(l))).toEqual(["TX -05 illegal move a1", "TX ED"]);
+        expect(lines.filter((l) => /^TX (-05|E[BWDA])/.test(l))).toEqual(["TX -05 illegal move a1", "TX EA"]);
+    });
+
+    it("stops a game against a v0.2 CPU with ED, and goes on to the next game", async () => {
+        const { player, lines } = await connectedCpu("illegal-move", "02");
+        expect((await play(player, new RandomPlayer("r", seededRandom(1)))).reason).toBe("violation");
+        expect(lines.filter((l) => /^TX E[BWDA]$/.test(l))).toEqual(["TX ED"]);
+        expect((await play(new RandomPlayer("r", seededRandom(2)), player)).reason).toBe("normal");
     });
 
     it("stops with a rule violation when the CPU passes with a legal move", async () => {

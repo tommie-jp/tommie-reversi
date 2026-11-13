@@ -1,4 +1,5 @@
-// A fake homebrew CPU that speaks RUP v0.2 on one end of a transport. It plays random
+// A fake homebrew CPU that speaks RUP on one end of a transport: the v0.3 draft by
+// default (it knows EA), or v0.2. It plays random
 // legal moves, and can be told to break the rules in one of several ways, to test how
 // the app reacts.
 
@@ -26,12 +27,16 @@ export interface FakeCpuOptions {
     readonly name: string;
     readonly seed: number;
     readonly misbehave?: Misbehaviour;
+    /** RUP version to act as. Default "03". */
+    readonly version?: "02" | "03";
 }
 
-const CAPABILITIES = "PI VE CA SB SW MO PA BO EB EW ED";
+const CAPABILITIES_V02 = "PI VE CA SB SW MO PA BO EB EW ED";
 
 export function startFakeCpu(transport: LineTransport, options: FakeCpuOptions): void {
     const random = seededRandom(options.seed);
+    const version = options.version ?? "03";
+    const capabilities = version === "03" ? `${CAPABILITIES_V02} EA` : CAPABILITIES_V02;
     let game: GameState | null = null;
     let color: Color = BLACK;
     let misbehaved = false;
@@ -80,13 +85,17 @@ export function startFakeCpu(transport: LineTransport, options: FakeCpuOptions):
         const command = line.slice(0, 2);
         switch (command) {
             case "PI": return send("+PI");
-            case "VE": return send(`+VE02${options.name}`);
-            case "CA": return send(`+CA ${CAPABILITIES}`);
+            case "VE": return send(`+VE${version}${options.name}`);
+            case "CA": return send(`+CA ${capabilities}`);
             case "SB": return start(BLACK);
             case "SW": return start(WHITE);
             case "MO":
             case "PA": return opponentMoved(line);
             case "BO": return;
+            case "EA":
+                if (version === "02") return send("-01 unknown command");
+                game = null;
+                return;
             case "EB":
             case "EW":
             case "ED":
