@@ -16,16 +16,17 @@
 
 ## ターミナル版 (CLI)
 
-Node.js 22 の入った PC で動かすデバッグ用の道具です。
+Node.js 22 の入った PC で動かすデバッグ用の道具です。最初に 1 度 `npm install` してから `./cli.sh` で動かします
+(どのディレクトリからでも動きます。`npm run cli -- [オプション]` でも同じです)。
 
 ```bash
-npm run cli                                          # 人 対 人
-npm run cli -- --list-ports                          # シリアルのポートを出す
-npm run cli -- --port /dev/ttyACM0                   # 人 対 CPU (CPU が黒)
-npm run cli -- --port /dev/ttyACM0 --fpga white      # CPU が白
-npm run cli -- --port /dev/ttyACM0 --opponent random --games 10 --fpga alternate
-                                                     # CPU と でたらめに打つ相手 を 10 局
-npm run cli -- --help                                # オプションの一覧
+./cli.sh                                          # 人 対 人
+./cli.sh --list-ports                             # シリアルのポートを出す
+./cli.sh --port /dev/ttyACM0                      # 人 対 CPU (CPU が黒)
+./cli.sh --port /dev/ttyACM0 --fpga white         # CPU が白
+./cli.sh --port /dev/ttyACM0 --opponent random --games 10 --fpga alternate
+                                                  # CPU と でたらめに打つ相手 を 10 局
+./cli.sh -h                                       # オプションの一覧
 ```
 
 - `f5` のようにマスを打って着手します。打てる所がないときは `pass` (または Enter) でパスします。

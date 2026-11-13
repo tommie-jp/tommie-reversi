@@ -16,16 +16,17 @@ using the [Reversi UART Protocol (RUP)](https://github.com/tommie-jp/reversi-uar
 
 ## Terminal version (CLI)
 
-A debugging tool that runs on a PC with Node.js 22.
+A debugging tool that runs on a PC with Node.js 22. Run `npm install` once, then use `./cli.sh`
+(it works from any directory; `npm run cli -- [options]` does the same).
 
 ```bash
-npm run cli                                          # person against person
-npm run cli -- --list-ports                          # list serial ports
-npm run cli -- --port /dev/ttyACM0                   # you against the CPU (the CPU plays black)
-npm run cli -- --port /dev/ttyACM0 --fpga white      # the CPU plays white
-npm run cli -- --port /dev/ttyACM0 --opponent random --games 10 --fpga alternate
-                                                     # the CPU against random moves, 10 games
-npm run cli -- --help                                # all options
+./cli.sh                                          # person against person
+./cli.sh --list-ports                             # list serial ports
+./cli.sh --port /dev/ttyACM0                      # you against the CPU (the CPU plays black)
+./cli.sh --port /dev/ttyACM0 --fpga white         # the CPU plays white
+./cli.sh --port /dev/ttyACM0 --opponent random --games 10 --fpga alternate
+                                                  # the CPU against random moves, 10 games
+./cli.sh -h                                       # all options
 ```
 
 - Type a square such as `f5` to play. `pass` (or Enter) passes when you have no legal move.

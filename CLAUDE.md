@@ -26,7 +26,7 @@ a Reversi app that plays against a homebrew CPU over UART using
 npm run check    # type-check (browser, Node, core)
 npm test         # vitest (serial tests need socat)
 npm run coverage # vitest with coverage (80% minimum)
-npm run cli      # the terminal version
+./cli.sh -h      # the terminal version (same as npm run cli -- ...)
 npm run lint:md  # markdownlint
 ```
 

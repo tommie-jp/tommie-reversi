@@ -115,7 +115,7 @@ function integer(value: string, min: number, max: number, name: string): Result<
     return err(`${name} must be an integer ${range} (got "${value}")`);
 }
 
-export const USAGE = `Usage: npm run cli -- [options]
+export const USAGE = `Usage: ./cli.sh [options]   (or: npm run cli -- [options])
 
 Play Reversi in the terminal: person against person, or against a homebrew CPU over RUP.
 
