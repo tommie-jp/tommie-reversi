@@ -7,14 +7,10 @@ import { join } from "node:path";
 
 export { isoLocal, recordText, type RecordFields } from "../core/record-file";
 
-export type Direction = "TX" | "RX";
+export { formatLogLine, type Direction } from "../core/rup/log-format";
+import { formatLogLine, type Direction } from "../core/rup/log-format";
 
 const pad = (value: number, width = 2) => String(value).padStart(width, "0");
-
-export function formatLogLine(date: Date, direction: Direction, line: string): string {
-    const time = `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`;
-    return `[${time}] ${direction} ${line}`;
-}
 
 export function fileStem(date: Date, gameNumber: number): string {
     const day = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`;
