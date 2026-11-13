@@ -1,0 +1,10 @@
+{
+  // Node code: the CLI, the Node serial transport and the tests. No DOM types.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"]
+  },
+  "include": ["src/core", "src/cli", "src/transport", "src/view/terminal", "test", "vitest.config.ts"],
+  "exclude": []
+}

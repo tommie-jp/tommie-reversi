@@ -13,7 +13,7 @@
     "dev": "vite",
     "build": "npm run check && vite build",
     "preview": "vite preview",
-    "check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.core.json",
+    "check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.core.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint:md": "npx --yes markdownlint-cli '*.md' 'docs/*.md'",

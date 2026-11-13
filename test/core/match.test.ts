@@ -88,6 +88,17 @@ describe("runMatch", () => {
         expect(await running).toEqual({ reason: "aborted", detail: "quit" });
     });
 
+    it("reports the position reached when a game is aborted", async () => {
+        const { events, onEvent } = collect();
+        const black = new ScriptedPlayer("black", [move("f5")]);
+        const white = new ScriptedPlayer("white", [move("d6")]);
+        const result = await runMatch({ black, white, onEvent });
+        expect(result.reason).toBe("aborted");
+        const finished = events.at(-1)!;
+        if (finished.type !== "finished") throw new Error("no finished event");
+        expect(finished.state.moves).toHaveLength(2);
+    });
+
     it("ignores errors from finish", async () => {
         const black = new ScriptedPlayer("black", [RESIGN]);
         const white = new ScriptedPlayer("white", []);

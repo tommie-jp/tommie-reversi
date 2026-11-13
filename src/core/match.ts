@@ -57,48 +57,39 @@ export interface MatchOptions {
 }
 
 export async function runMatch(options: MatchOptions): Promise<MatchResult> {
-    let state = newGame();
+    // Kept up to date move by move, so an aborted game still reports where it stopped.
+    const progress = { state: newGame() };
     let result: MatchResult;
     try {
         await Promise.all([options.black.start(BLACK), options.white.start(WHITE)]);
-        options.onEvent({ type: "started", state });
-        const played = await playUntilEnd(state, options);
-        state = played.state;
-        result = played.result;
+        options.onEvent({ type: "started", state: progress.state });
+        result = await playUntilEnd(progress, options);
     } catch (error) {
         result = { reason: "aborted", detail: describe(error) };
     }
     await Promise.allSettled([options.black.finish(result), options.white.finish(result)]);
-    options.onEvent({ type: "finished", state, result });
+    options.onEvent({ type: "finished", state: progress.state, result });
     return result;
 }
 
-interface Played {
-    readonly state: GameState;
-    readonly result: MatchResult;
-}
-
-async function playUntilEnd(
-    start: GameState,
-    options: MatchOptions,
-): Promise<Played> {
+async function playUntilEnd(progress: { state: GameState }, options: MatchOptions): Promise<MatchResult> {
     const playerOf = (color: Color): Player => (color === BLACK ? options.black : options.white);
-    let state = start;
-    while (state.status === "playing") {
+    while (progress.state.status === "playing") {
+        const state = progress.state;
         const color = state.turn;
         const attempted = await abortable(playerOf(color).requestMove(state), options.signal);
-        if (attempted.kind === "resign") return { state, result: { reason: "resign", by: color } };
+        if (attempted.kind === "resign") return { reason: "resign", by: color };
         const next = apply(state, attempted);
         if (!next.ok) {
             options.onEvent({ type: "violation", color, attempted, error: next.error });
-            return { state, result: { reason: "violation", by: color, attempted, error: next.error } };
+            return { reason: "violation", by: color, attempted, error: next.error };
         }
-        state = next.value;
-        const move = state.moves.at(-1)!;
-        options.onEvent({ type: "moved", move, state });
-        await abortable(playerOf(opponent(color)).opponentMoved(move, state), options.signal);
+        progress.state = next.value;
+        const move = next.value.moves.at(-1)!;
+        options.onEvent({ type: "moved", move, state: next.value });
+        await abortable(playerOf(opponent(color)).opponentMoved(move, next.value), options.signal);
     }
-    return { state, result: { reason: "normal", outcome: state.outcome! } };
+    return { reason: "normal", outcome: progress.state.outcome! };
 }
 
 function apply(state: GameState, attempted: Exclude<PlayerMove, { kind: "resign" }>): Result<GameState, GameError> {
