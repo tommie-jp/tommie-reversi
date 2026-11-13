@@ -2,25 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
     BLACK,
     WHITE,
-    boardFromBO,
     countDiscs,
     indexToSquare,
     initialBoard,
     squareToIndex,
-    type Board,
 } from "../../src/core/board";
+import { boardOf } from "../helpers/board";
 import { applyMove, flipsFor, hasLegalMove, legalMoves } from "../../src/core/rules";
 
 const at = (square: string): number => squareToIndex(square)!;
 const squares = (indexes: readonly number[]): string[] => indexes.map(indexToSquare);
 
-/** Builds a board from 8 rows of 8 characters: . = empty, X = black, O = white. */
-function boardOf(rows: readonly string[]): Board {
-    const text = rows.join("").replace(/\./g, "0").replace(/X/g, "1").replace(/O/g, "2");
-    const board = boardFromBO(text);
-    if (board === null) throw new Error("bad test board");
-    return board;
-}
 
 describe("flipsFor", () => {
     it("flips d4 when black plays d3 on the initial board", () => {
