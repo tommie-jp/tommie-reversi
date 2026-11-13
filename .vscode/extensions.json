@@ -1,0 +1,6 @@
+{
+  "recommendations": [
+    "vitest.explorer",
+    "davidanson.vscode-markdownlint"
+  ]
+}

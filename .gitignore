@@ -1,0 +1,17 @@
+# Dependencies / build output
+node_modules/
+dist/
+coverage/
+
+# Claude Code (local-only / secrets)
+.claude/settings.local.json
+.claude/.credentials.json
+.claude/cache/
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
