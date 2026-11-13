@@ -108,9 +108,8 @@ export class RupPlayer implements Player {
     }
 
     async finish(result: MatchResult): Promise<void> {
-        this.stopPing?.();
-        this.stopPing = null;
-        this.waiter = null;
+        this.stopHeartbeat();
+        this.rejectWaiter(new Error("the game is over"));
         this.inbox.length = 0;
         if (result.reason !== "normal") return;
         const end = { black: "EB", white: "EW", draw: "ED" } as const;
@@ -177,6 +176,7 @@ export class RupPlayer implements Player {
     }
 
     private disconnect(reason: string): void {
+        this.stopHeartbeat();
         this.disconnected ??= new Error(reason);
         this.rejectWaiter(this.disconnected);
     }
@@ -185,6 +185,11 @@ export class RupPlayer implements Player {
         const waiter = this.waiter;
         this.waiter = null;
         waiter?.reject(error);
+    }
+
+    private stopHeartbeat(): void {
+        this.stopPing?.();
+        this.stopPing = null;
     }
 
     private startPing(): void {

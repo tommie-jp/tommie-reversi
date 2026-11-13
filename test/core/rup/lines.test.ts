@@ -32,6 +32,11 @@ describe("LineSplitter", () => {
         expect(feed("MOd3\rPA\r", "\r").lines).toEqual(["MOd3", "PA"]);
     });
 
+    it("ends a line at a CR at once, without waiting for more input", () => {
+        expect(feed("MOf5\r").lines).toEqual(["MOf5"]);
+        expect(feed("MOf5\r", "\nPA\r\n").lines).toEqual(["MOf5", "PA"]);
+    });
+
     it("skips empty lines", () => {
         expect(feed("\r\n\r\nPI\r\n\n").lines).toEqual(["PI"]);
     });

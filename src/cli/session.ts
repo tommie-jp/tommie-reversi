@@ -51,6 +51,8 @@ export class Session {
     /** RUP lines logged before the first game's files exist (the PI/VE of connecting). */
     private earlyRup: { direction: Direction; line: string; date: Date }[] = [];
     private readonly tally = { black: 0, white: 0, draw: 0 };
+    /** A game was stopped by a rule violation, an error reply or a lost connection. */
+    private anyStopped = false;
 
     constructor(
         private readonly options: PlayOptions,
@@ -101,14 +103,18 @@ export class Session {
                 this.stopReason = null;
                 continue;
             }
-            if (result.reason === "normal") this.tally[result.outcome]++;
+            this.count(result);
+            const stopped = result.reason === "violation" || result.reason === "aborted";
+            this.anyStopped ||= stopped;
             if (this.options.opponent === "random") {
-                const stopped = result.reason !== "normal" && result.reason !== "resign";
                 if (!stopped && gameNumber < this.options.games) continue;
                 this.writeSummary(gameNumber, stopped ? result.reason : null);
                 return stopped ? EXIT.stopped : EXIT.ok;
             }
-            if ((await this.waitAfterGame()) === "quit") return EXIT.ok;
+            if ((await this.waitAfterGame()) === "quit") {
+                if (this.stopReason === "interrupted") return EXIT.interrupted;
+                return this.anyStopped ? EXIT.stopped : EXIT.ok;
+            }
         }
     }
 
@@ -119,6 +125,8 @@ export class Session {
         const seats = this.deps.seats(gameNumber, this);
         this.seats = seats;
         this.humans = seats.humans;
+        // Judge whose turn it is by the new game, even before it has started.
+        this.state = newGame();
         this.controller = new AbortController();
         this.interaction.setInGame(true);
         if (this.options.games > 1) this.deps.write(`\n=== Game ${gameNumber} of ${this.options.games} ===\n`);
@@ -171,7 +179,6 @@ export class Session {
         const status = renderStatus(
             this.state,
             { black: remainingMs(this.clock, BLACK, now), white: remainingMs(this.clock, WHITE, now) },
-            this.options.color,
         );
         this.deps.write(`\n${board}\n${status}\n`);
         const waitingFor = this.state.status === "playing" && this.humans.length > 0 && !this.humans.includes(this.state.turn);
@@ -179,6 +186,11 @@ export class Session {
             const name = this.state.turn === BLACK ? this.seats.black.name : this.seats.white.name;
             this.deps.write(`waiting for ${colorName(this.state.turn)} (${name})...\n`);
         }
+    }
+
+    private count(result: MatchResult): void {
+        if (result.reason === "normal") this.tally[result.outcome]++;
+        if (result.reason === "resign") this.tally[result.by === BLACK ? "white" : "black"]++;
     }
 
     private writeSummary(played: number, stoppedReason: string | null): void {

@@ -69,14 +69,13 @@ function symbol(cell: Cell, isHint: boolean, paint: (code: string, text: string)
     return isHint ? paint(ANSI.hint, HINT) : SYMBOL[0];
 }
 
-export function renderStatus(state: GameState, timeLeft: TimeLeft, color: boolean): string {
+export function renderStatus(state: GameState, timeLeft: TimeLeft): string {
     const { black, white } = countDiscs(state.board);
     const running = state.status === "playing" ? state.turn : null;
     const side = (c: Color, count: number, ms: number) =>
         `${colorName(c)} ${c === BLACK ? "X" : "O"} ${String(count).padStart(2)} ` +
         `${running === c ? "*" : " "}${String(Math.ceil(ms / 1000)).padStart(2)}s`;
-    const text = `  ${side(1, black, timeLeft.black)}   ${side(2, white, timeLeft.white)}   ${lastMoveText(state)}`;
-    return color ? text : stripAnsi(text);
+    return `  ${side(1, black, timeLeft.black)}   ${side(2, white, timeLeft.white)}   ${lastMoveText(state)}`;
 }
 
 function lastMoveText(state: GameState): string {

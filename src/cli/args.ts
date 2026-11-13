@@ -71,15 +71,17 @@ function playOptions(values: Values, env: Readonly<Record<string, string | undef
     if (port === null && needsPort !== undefined) return err(`--${needsPort} needs --port`);
 
     const fpga = oneOf(values.fpga ?? "black", FPGA_COLORS, "--fpga");
+    if (!fpga.ok) return fpga;
     const opponent = oneOf(values.opponent ?? "human", OPPONENTS, "--opponent");
+    if (!opponent.ok) return opponent;
     const baud = oneOf(values.baud ?? "115200", BAUD_RATES.map(String), "--baud");
+    if (!baud.ok) return baud;
     const games = integer(values.games ?? "1", 1, MAX_GAMES, "--games");
+    if (!games.ok) return games;
     const seconds = integer(values.seconds ?? "60", 1, MAX_SECONDS, "--seconds");
+    if (!seconds.ok) return seconds;
     const seed = values.seed === undefined ? ok(null) : integer(values.seed, 0, Number.MAX_SAFE_INTEGER, "--seed");
-    for (const checked of [fpga, opponent, baud, games, seconds, seed]) {
-        if (!checked.ok) return checked;
-    }
-    if (!fpga.ok || !opponent.ok || !baud.ok || !games.ok || !seconds.ok || !seed.ok) return err("unreachable");
+    if (!seed.ok) return seed;
 
     if (games.value > 1 && opponent.value !== "random") return err("--games above 1 needs --opponent random");
     if (seed.value !== null && opponent.value !== "random") return err("--seed needs --opponent random");

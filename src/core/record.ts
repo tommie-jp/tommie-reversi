@@ -3,6 +3,7 @@
 // be worked out from the board. Reading is lenient: uppercase, spaces, `#` comment
 // lines and the pass tokens `pa` / `ps` are accepted, the same as Edax.
 
+import { isSquare } from "./board";
 import { mustPass, newGame, playMove, playPass, type GameError, type GameState, type Move } from "./game";
 import { err, ok, type Result } from "./result";
 
@@ -18,7 +19,6 @@ interface Token {
 }
 
 const PASS_TOKENS = new Set(["pa", "ps"]);
-const SQUARE_TOKEN = /^[a-h][1-8]$/;
 
 export function formatRecord(moves: readonly Move[]): string {
     return moves.map((move) => (move.kind === "move" ? move.square : "")).join("");
@@ -40,7 +40,7 @@ function playToken(game: GameState, token: Token): Result<GameState, RecordError
         const passed = playPass(game);
         return passed.ok ? passed : fail(passed.error);
     }
-    if (!SQUARE_TOKEN.test(token.text)) return fail("bad-token");
+    if (!isSquare(token.text)) return fail("bad-token");
     // A pass that is not written down is filled in here.
     const ready = mustPass(game) ? playPass(game) : ok(game);
     if (!ready.ok) return fail(ready.error);

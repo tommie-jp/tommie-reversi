@@ -31,9 +31,14 @@ export function opponent(color: Color): Color {
     return color === BLACK ? WHITE : BLACK;
 }
 
+/** True for "a1" to "h8", lowercase only, as in RUP. */
+export function isSquare(text: string): boolean {
+    return SQUARE_PATTERN.test(text);
+}
+
 /** "f5" → 37. Lowercase only, as in RUP. Returns null for anything else. */
 export function squareToIndex(square: string): number | null {
-    if (!SQUARE_PATTERN.test(square)) return null;
+    if (!isSquare(square)) return null;
     const column = square.charCodeAt(0) - "a".charCodeAt(0);
     const row = square.charCodeAt(1) - "1".charCodeAt(0);
     return row * BOARD_SIZE + column;

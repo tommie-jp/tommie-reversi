@@ -1,5 +1,7 @@
 // Reads one line typed by the person.
 
+import { isSquare } from "../../core/board";
+
 export type Command =
     | { readonly type: "move"; readonly square: string }
     | { readonly type: "pass" }
@@ -19,13 +21,12 @@ const WORDS: Readonly<Record<string, Command>> = {
     quit: { type: "quit" },
     q: { type: "quit" },
 };
-const SQUARE = /^[a-h][1-8]$/;
 const ECHO_LIMIT = 20;
 
 export function parseInput(text: string): Command {
     const word = text.trim().toLowerCase();
     if (word === "") return { type: "empty" };
-    if (SQUARE.test(word)) return { type: "move", square: word };
+    if (isSquare(word)) return { type: "move", square: word };
     const command = WORDS[word];
     if (command !== undefined) return command;
     const shown = word.length > ECHO_LIMIT ? word.slice(0, ECHO_LIMIT) + "..." : word;

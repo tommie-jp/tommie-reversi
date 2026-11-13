@@ -63,20 +63,20 @@ describe("renderBoard", () => {
 describe("renderStatus", () => {
     it("shows counts, time left with a mark on the side to move, and the last move", () => {
         const game = after("f5");
-        expect(renderStatus(game, { black: 60_000, white: 59_200 }, false)).toBe(
+        expect(renderStatus(game, { black: 60_000, white: 59_200 })).toBe(
             "  Black X  4  60s   White O  1 *60s   Move 1: f5 (Black)",
         );
     });
 
     it("shows move 0 before the first move", () => {
-        expect(renderStatus(newGame(), { black: 5_000, white: 60_000 }, false)).toBe(
+        expect(renderStatus(newGame(), { black: 5_000, white: 60_000 })).toBe(
             "  Black X  2 * 5s   White O  2  60s   Move 0",
         );
     });
 
     it("rounds the seconds up so that 0s means the time is really out", () => {
-        expect(renderStatus(newGame(), { black: 100, white: 60_000 }, false)).toContain("* 1s");
-        expect(renderStatus(newGame(), { black: 0, white: 60_000 }, false)).toContain("* 0s");
+        expect(renderStatus(newGame(), { black: 100, white: 60_000 })).toContain("* 1s");
+        expect(renderStatus(newGame(), { black: 0, white: 60_000 })).toContain("* 0s");
     });
 });
 

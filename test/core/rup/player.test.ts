@@ -211,6 +211,24 @@ describe("RupPlayer during a game", () => {
         await expect(player.requestMove(newGame())).rejects.toThrow("disconnected");
     });
 
+    it("cancels the 90 s notice when the game is stopped while waiting", async () => {
+        const { player, timers, notices } = setup();
+        const waiting = player.requestMove(newGame());
+        const outcome = waiting.then(() => "resolved", () => "rejected");
+        await player.finish({ reason: "aborted", detail: "new game" });
+        await timers.advance(100_000);
+        expect(notices).toEqual([]);
+        expect(await outcome).toBe("rejected");
+    });
+
+    it("stops sending PI once the connection is lost", async () => {
+        const { player, timers, cpu, received } = setup();
+        await player.start(BLACK);
+        await cpu.close();
+        await timers.advance(30_000);
+        expect(received.filter((l) => l === "PI")).toHaveLength(0);
+    });
+
     it.each([
         ["black", "EB"],
         ["white", "EW"],

@@ -225,6 +225,81 @@ describe("Session", () => {
         expect(text()).toContain("Played 1 game: stopped at game 1 (violation).");
     });
 
+    it("returns 130 for Ctrl+C while waiting after a game", async () => {
+        const { session } = harness([], () => ({
+            black: new ScriptedPlayer("b", [{ kind: "resign" }]),
+            white: new ScriptedPlayer("w", []),
+            humans: [],
+        }));
+        const running = session.run();
+        await tick();
+        session.interrupt();
+        expect(await running).toBe(EXIT.interrupted);
+    });
+
+    it("counts a resignation as a win in the summary", async () => {
+        const { session, text } = harness(
+            ["--port", "/dev/x", "--opponent", "random", "--games", "2"],
+            () => ({ black: new ScriptedPlayer("cpu", [{ kind: "resign" }]), white: new ScriptedPlayer("r", []), humans: [] }),
+        );
+        expect(await session.run()).toBe(EXIT.ok);
+        expect(text()).toContain("Played 2 games: black won 0, white won 2, drawn 0.");
+    });
+
+    it("returns 3 at the end when a game against a person was stopped by the CPU", async () => {
+        const { session } = harness([], () => ({
+            black: new ScriptedPlayer("cpu", [move("a1")]),
+            white: new ScriptedPlayer("you", []),
+            humans: [2],
+        }));
+        const running = session.run();
+        await tick();
+        session.interaction.handleLine("quit");
+        expect(await running).toBe(EXIT.stopped);
+    });
+
+    it("returns 0 when the person stopped the game themselves", async () => {
+        const { session } = harness([], (_n, s) => ({
+            black: new HumanPlayer("Black", s.interaction, () => s.timeLeftMs(), false),
+            white: new HumanPlayer("White", s.interaction, () => s.timeLeftMs(), false),
+            humans: [1, 2],
+        }));
+        const running = session.run();
+        await tick();
+        session.interaction.handleLine("quit");
+        session.interaction.handleLine("y");
+        expect(await running).toBe(EXIT.ok);
+    });
+
+    it("judges whose turn it is by the new game as soon as it starts", async () => {
+        let game = 0;
+        const { session, text } = harness([], (_n, s) => {
+            game++;
+            // Game 1: a person is white and stops the game on their turn.
+            // Game 2: the CPU is black and starts slowly, so input during its start must be ignored.
+            if (game === 1) {
+                return {
+                    black: new ScriptedPlayer("cpu", [move("f5")]),
+                    white: new HumanPlayer("you", s.interaction, () => s.timeLeftMs(), true),
+                    humans: [2],
+                };
+            }
+            const slow = new ScriptedPlayer("cpu", [{ kind: "resign" }]);
+            slow.start = () => new Promise((resolve) => setTimeout(resolve, 20));
+            return { black: slow, white: new HumanPlayer("you", s.interaction, () => s.timeLeftMs(), true), humans: [2] };
+        });
+        const running = session.run();
+        await tick();
+        session.interaction.handleLine("new");
+        session.interaction.handleLine("y");
+        await tick();
+        session.interaction.handleLine("d6");
+        expect(text()).toContain("Not your turn: input ignored.");
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        session.interaction.handleLine("quit");
+        expect(await running).toBe(EXIT.ok);
+    });
+
     it("shows the board again on request and logs RUP lines to the current game", async () => {
         const { session, files, text } = harness([], (_n, s) => ({
             black: new HumanPlayer("Black", s.interaction, () => s.timeLeftMs(), false),

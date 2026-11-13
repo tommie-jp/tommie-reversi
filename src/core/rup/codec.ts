@@ -4,7 +4,7 @@
 // decode never throws. A line that breaks the rules becomes `invalid` with the RUP
 // error code (section 7.3) that a strict receiver would answer with.
 
-import { boardFromBO, boardToBO, type Board } from "../board";
+import { boardFromBO, boardToBO, isSquare, type Board } from "../board";
 
 /** Lines the host (this app) sends to the CPU. */
 export type RupOut =
@@ -46,7 +46,6 @@ export type RupErrorCode = "00" | "01" | "02" | "04";
 
 export const MAX_LINE_LENGTH = 128;
 
-const SQUARE = /^[a-h][1-8]$/;
 const PRINTABLE = /^[\x20-\x7e]*$/;
 const SIMPLE: Readonly<Record<string, RupIn>> = {
     PA: { type: "PA" },
@@ -61,7 +60,7 @@ const KNOWN_COMMANDS = new Set([
 export function encode(message: RupOut): string {
     switch (message.type) {
         case "MO":
-            if (!SQUARE.test(message.square)) throw new RangeError(`not a RUP square: ${message.square}`);
+            if (!isSquare(message.square)) throw new RangeError(`not a RUP square: ${message.square}`);
             return "MO" + message.square;
         case "BO":
             return "BO" + boardToBO(message.board);
@@ -85,7 +84,7 @@ export function decode(line: string): RupIn {
 function decodeCommand(command: string, rest: string): RupIn | null {
     switch (command) {
         case "MO":
-            return SQUARE.test(rest) ? { type: "MO", square: rest } : null;
+            return isSquare(rest) ? { type: "MO", square: rest } : null;
         case "BS": {
             const board = boardFromBO(rest);
             return board === null ? null : { type: "BS", board };
