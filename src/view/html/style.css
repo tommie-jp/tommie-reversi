@@ -241,3 +241,33 @@ dialog.panel::backdrop { background: rgb(0 0 0 / 0.55); }
 }
 .field input.check { width: 22px; height: 22px; }
 .settings-form .save { justify-self: end; background: var(--accent); color: #222; border-color: var(--accent); font-weight: 700; }
+
+/* ---- CPU link, notes, new game, log ---- */
+.link { font-size: 0.85rem; color: var(--muted); max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link.bad { color: var(--alert); }
+.link[hidden] { display: none; }
+.note { grid-column: 1 / -1; margin: 0; padding: 6px 12px; border-radius: 8px; background: rgb(255 207 63 / 0.15); color: var(--accent); font-size: 0.95rem; }
+.note[hidden] { display: none; }
+.opponents { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px 12px; margin: 0 0 12px; display: grid; gap: 10px; }
+.opponents legend { color: var(--muted); padding: 0 4px; }
+.unsupported { color: var(--alert); margin: 0 0 12px; }
+.unsupported[hidden], .cpu-options[hidden], .disconnect[hidden] { display: none; }
+.cpu-options { display: grid; gap: 10px; margin-bottom: 12px; }
+.link-state { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--panel); }
+.link-state.bad { color: var(--alert); }
+.panel .start { width: 100%; background: var(--accent); color: #222; border-color: var(--accent); font-weight: 700; min-height: 48px; }
+.panel .start:disabled { opacity: 0.45; cursor: not-allowed; }
+pre.log {
+  margin: 10px 0 0;
+  padding: 10px;
+  min-height: 12rem;
+  max-height: 60dvh;
+  overflow: auto;
+  border-radius: 8px;
+  background: #0d2219;
+  color: var(--ink);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}

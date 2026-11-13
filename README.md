@@ -6,7 +6,8 @@ A Reversi app for playing against a homebrew CPU (for example on an FPGA) over U
 using the [Reversi UART Protocol (RUP)](https://github.com/tommie-jp/reversi-uart-protocol).
 
 > Status: early development. The terminal version (CLI) works. The browser version plays person against person
-> (with clocks, sound, saved records and settings); playing a CPU over Web Serial comes next.
+> and a person against a CPU over Web Serial (Chrome or Edge on Android or a PC), with clocks, sound, saved
+> records and settings. Add `?cpu=fake` to the URL to play a fake CPU in the page, without hardware.
 
 ## Goals
 

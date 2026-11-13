@@ -1,15 +1,23 @@
 // Puts the web app together: settings, the controller, the board, the status with the
-// clocks, sound, saved records, and the screen lock, for a game between two people.
+// clocks, sound, saved records, the screen lock, and the CPU link (Web Serial).
+// With ?cpu=fake in the URL, a fake RUP CPU in the page stands in for Web Serial.
 
-import { BLACK, WHITE, countDiscs } from "../../core/board";
+import { BLACK, countDiscs } from "../../core/board";
 import { formatRecord } from "../../core/record";
 import { isoLocal } from "../../core/record-file";
 import { ClockAlerts } from "../../app/clock-display";
-import { GameController, type Seats, type Snapshot } from "../../app/controller";
+import { CpuLink, type OpenedPort } from "../../app/cpu-link";
+import { GameController, type Snapshot } from "../../app/controller";
+import { buildSeats, type GameChoice } from "../../app/seats";
+import { startFakeCpu } from "../../transport/fake-cpu";
+import { createLoopbackPair } from "../../transport/loopback";
+import { systemTimers } from "../../transport/system-timers";
+import { browserSerial, openWebSerial, portLabel, webSerialSupport } from "../../transport/web-serial";
+import { LogView } from "./log-view";
+import { NewGameView } from "./new-game-view";
 import { messagesFor, pickLanguage, type Messages } from "../../app/messages";
 import { Sound } from "../../app/sound";
 import { GameStore, SettingsStore, type KeyValueStore } from "../../app/storage";
-import { TapPlayer } from "../../app/tap-player";
 import { BoardView } from "./board-view";
 import { APP_COMMIT, APP_VERSION } from "./build-info";
 import { el } from "./dom";
@@ -66,15 +74,45 @@ function main(): void {
     };
     const controller = new GameController({ onChange: render, now: () => Date.now(), clockLimitMs: settings.clockSeconds * 1000 });
     const board = new BoardView(boardArea, (square) => controller.tap(square));
-    const startLocal = () => controller.start(localSeats(messages.person, () => render(controller.snapshot())));
-    const status = new StatusView(side, messages, {
-        onPass: () => controller.pass(),
-        onNewGame: () => {
+
+    const fakeCpu = new URLSearchParams(window.location.search).get("cpu") === "fake";
+    const support = fakeCpu ? "ok" : webSerialSupport(navigator, window.isSecureContext);
+    const link = new CpuLink({
+        timers: systemTimers,
+        now: () => Date.now(),
+        onChange: () => {
+            newGame.update(link.state);
+            showLink(header.link, link, messages);
+        },
+        onNotice: (text) => status.setNote(text),
+    });
+    let choice: GameChoice = { opponent: "person", cpuColor: BLACK };
+    const startGame = (next: GameChoice) => {
+        const seats = buildSeats(next, {
+            person: messages.person,
+            cpu: link.player,
+            confirm: settings.confirmMove,
+            onChange: () => render(controller.snapshot()),
+        });
+        if (seats === null) return;
+        choice = next;
+        status.setNote(null);
+        controller.start(seats);
+    };
+    const newGame = new NewGameView(root, messages, {
+        onConnect: () => void link.connect(() => openPort(fakeCpu, settings.baudRate)),
+        onDisconnect: () => void link.disconnect(),
+        onStart: (next) => {
             const running = latest !== null && latest.result === null && latest.state.moves.length > 0;
             if (running && !window.confirm(messages.confirmNewGame)) return;
-            startLocal();
+            startGame(next);
         },
     });
+    const status = new StatusView(side, messages, {
+        onPass: () => controller.pass(),
+        onNewGame: () => newGame.open(choice, link.state, support),
+    });
+    const logView = new LogView(root, messages, { text: (options) => link.logText(options), copy: copyText });
     const records = new RecordsView(root, messages, {
         list: () => games.list(),
         copy: copyText,
@@ -92,9 +130,12 @@ function main(): void {
         if (latest !== null) render(latest);
     });
     header.records.addEventListener("click", () => records.open());
+    header.log.addEventListener("click", () => logView.open());
+    showLink(header.link, link, messages);
     header.settings.addEventListener("click", () => settingsView.open(settings));
 
     window.setInterval(() => {
+        if (logView.isOpen) logView.refresh();
         if (latest === null) return;
         const playing = latest.result === null && latest.state.status === "playing";
         const running = playing ? latest.state.turn : null;
@@ -105,11 +146,34 @@ function main(): void {
         if (alert !== null) sound.play(alert);
     }, CLOCK_TICK_MS);
 
-    startLocal();
+    startGame(choice);
+}
+
+/** Opens the serial port chosen by the person, or a fake CPU with ?cpu=fake. */
+async function openPort(fake: boolean, baudRate: number): Promise<OpenedPort> {
+    if (fake) {
+        const [host, cpu] = createLoopbackPair();
+        startFakeCpu(cpu, { name: "fake-cpu", seed: Date.now() % 1_000_000 });
+        return { transport: host, label: "fake" };
+    }
+    const serial = browserSerial();
+    if (serial === null) throw new Error("this browser has no Web Serial");
+    // Called from the Connect tap, so the browser may show its port chooser.
+    const port = await serial.requestPort({});
+    return { transport: await openWebSerial(port, baudRate), label: portLabel(port) };
+}
+
+function showLink(target: HTMLElement, link: CpuLink, messages: Messages): void {
+    const state = link.state;
+    target.textContent = state.kind === "connected" ? `CPU: ${state.name}` : state.kind === "idle" ? "" : `CPU: ${messages.linkState(state)}`;
+    target.classList.toggle("bad", state.kind === "lost" || state.kind === "failed");
+    target.hidden = state.kind === "idle";
 }
 
 interface TopBar {
     readonly bar: HTMLElement;
+    readonly link: HTMLElement;
+    readonly log: HTMLButtonElement;
     readonly records: HTMLButtonElement;
     readonly settings: HTMLButtonElement;
     readonly soundNote: HTMLElement;
@@ -123,22 +187,17 @@ function topBar(messages: Messages): TopBar {
     const commit = el("span", "commit", APP_COMMIT);
     const records = el("button", "top-button", messages.records);
     const settings = el("button", "top-button", messages.settings);
+    const log = el("button", "top-button", messages.log);
     records.type = "button";
     settings.type = "button";
+    log.type = "button";
+    const link = el("span", "link");
+    link.hidden = true;
     const soundNote = el("span", "sound-note", messages.soundBlocked);
     soundNote.hidden = true;
     soundNote.setAttribute("role", "status");
-    bar.append(title, version, commit, el("span", "spacer"), soundNote, records, settings);
-    return { bar, records, settings, soundNote };
-}
-
-/** Two people taking turns at this screen. */
-function localSeats(person: string, onChange: () => void): Seats {
-    return {
-        black: new TapPlayer(person, { onChange }),
-        white: new TapPlayer(person, { onChange }),
-        humans: [BLACK, WHITE],
-    };
+    bar.append(title, version, commit, el("span", "spacer"), link, soundNote, log, records, settings);
+    return { bar, link, log, records, settings, soundNote };
 }
 
 function changed(previous: Snapshot | null, next: Snapshot): boolean {
