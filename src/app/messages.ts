@@ -3,6 +3,7 @@
 import { type Color, BLACK } from "../core/board";
 import type { GameError } from "../core/game";
 import type { MatchResult } from "../core/match";
+import type { LinkState } from "./cpu-link";
 
 export type Language = "ja" | "en";
 
@@ -51,6 +52,21 @@ export interface Messages {
     readonly languageAuto: string;
     readonly saveFailed: string;
     readonly soundBlocked: string;
+    readonly baudRate: string;
+    readonly opponent: string;
+    readonly opponentPerson: string;
+    readonly opponentCpu: string;
+    readonly cpuColor: string;
+    readonly cpuBlack: string;
+    readonly cpuWhite: string;
+    readonly connect: string;
+    readonly disconnect: string;
+    readonly start: string;
+    readonly log: string;
+    readonly hidePing: string;
+    readonly emptyLog: string;
+    readonly linkState: (state: LinkState) => string;
+    readonly serialUnsupported: (reason: "no-api" | "insecure") => string;
     readonly result: (result: MatchResult, counts: Counts) => string;
 }
 
@@ -84,6 +100,32 @@ const ja: Messages = {
     languageAuto: "ブラウザに合わせる",
     saveFailed: "このブラウザには保存できません (プライベートモードなど)",
     soundBlocked: "音を出すには、画面をタップしてください",
+    baudRate: "ボーレート (USB-UART 変換器のとき)",
+    opponent: "相手",
+    opponentPerson: "人",
+    opponentCpu: "CPU (シリアル)",
+    cpuColor: "CPU の色",
+    cpuBlack: "黒 (先手)",
+    cpuWhite: "白 (後手)",
+    connect: "つなぐ",
+    disconnect: "切る",
+    start: "始める",
+    log: "ログ",
+    hidePing: "PI と +PI を隠す",
+    emptyLog: "(まだ何も送受信していません)",
+    linkState: (state) => {
+        switch (state.kind) {
+            case "idle": return "つながっていません";
+            case "connecting": return "つないでいます…";
+            case "connected": return `${state.name} (RUP ${state.version || "?"}, ${state.port})`;
+            case "lost": return `切れました: ${state.reason}`;
+            case "failed": return `つなげませんでした: ${state.message}`;
+        }
+    },
+    serialUnsupported: (reason) =>
+        reason === "no-api"
+            ? "このブラウザでは CPU とつなげません (Web Serial がありません)。Android か PC の Chrome / Edge を使ってください"
+            : "HTTPS のページでないと CPU とつなげません",
     gameError: (error, square) => {
         switch (error) {
             case "no-flips": return `${square} は 1 つも返せません`;
@@ -143,6 +185,32 @@ const en: Messages = {
     languageAuto: "Same as the browser",
     saveFailed: "This browser cannot save (private mode?)",
     soundBlocked: "Tap the screen to turn on sound",
+    baudRate: "Baud rate (for a USB-UART bridge)",
+    opponent: "Opponent",
+    opponentPerson: "Person",
+    opponentCpu: "CPU (serial)",
+    cpuColor: "CPU plays",
+    cpuBlack: "Black (first)",
+    cpuWhite: "White (second)",
+    connect: "Connect",
+    disconnect: "Disconnect",
+    start: "Start",
+    log: "Log",
+    hidePing: "Hide PI and +PI",
+    emptyLog: "(nothing sent or received yet)",
+    linkState: (state) => {
+        switch (state.kind) {
+            case "idle": return "Not connected";
+            case "connecting": return "Connecting...";
+            case "connected": return `${state.name} (RUP ${state.version || "?"}, ${state.port})`;
+            case "lost": return `Lost: ${state.reason}`;
+            case "failed": return `Could not connect: ${state.message}`;
+        }
+    },
+    serialUnsupported: (reason) =>
+        reason === "no-api"
+            ? "This browser cannot connect to a CPU (no Web Serial). Use Chrome or Edge on Android or a PC"
+            : "Connecting to a CPU needs an HTTPS page",
     gameError: (error, square) => {
         switch (error) {
             case "no-flips": return `${square} does not flip any disc`;

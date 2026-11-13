@@ -1,7 +1,7 @@
 // The settings form: clock seconds, sound, hints, tap-twice confirmation, language.
 
 import type { Messages } from "../../app/messages";
-import { MAX_CLOCK_SECONDS, parseSettings, type Settings } from "../../app/settings";
+import { BAUD_RATES, MAX_CLOCK_SECONDS, parseSettings, type Settings } from "../../app/settings";
 import { closeDialog, makeDialog, openDialog } from "./dialog";
 import { el } from "./dom";
 
@@ -20,6 +20,7 @@ export class SettingsView {
             this.checkField("hints", messages.hints),
             this.checkField("confirmMove", messages.confirmMoveSetting),
             this.languageField(),
+            this.baudField(),
         );
         const save = el("button", "save", messages.save);
         save.type = "button";
@@ -34,6 +35,7 @@ export class SettingsView {
         this.input("hints").checked = settings.hints;
         this.input("confirmMove").checked = settings.confirmMove;
         this.form.querySelector<HTMLSelectElement>('[name="language"]')!.value = settings.language;
+        this.form.querySelector<HTMLSelectElement>('[name="baudRate"]')!.value = String(settings.baudRate);
         openDialog(this.dialog);
     }
 
@@ -45,6 +47,7 @@ export class SettingsView {
                 hints: this.input("hints").checked,
                 confirmMove: this.input("confirmMove").checked,
                 language: this.form.querySelector<HTMLSelectElement>('[name="language"]')!.value,
+                baudRate: Number(this.form.querySelector<HTMLSelectElement>('[name="baudRate"]')!.value),
             }),
         );
         closeDialog(this.dialog);
@@ -69,6 +72,17 @@ export class SettingsView {
         input.type = "checkbox";
         input.name = name;
         return labelled(label, input, true);
+    }
+
+    private baudField(): HTMLElement {
+        const select = el("select", "baud");
+        select.name = "baudRate";
+        for (const rate of BAUD_RATES) {
+            const option = el("option", "", rate.toLocaleString("en-US"));
+            option.value = String(rate);
+            select.append(option);
+        }
+        return labelled(this.messages.baudRate, select);
     }
 
     private languageField(): HTMLElement {

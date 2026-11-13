@@ -22,6 +22,7 @@ describe("SettingsView", () => {
         expect(field<HTMLInputElement>("hints").checked).toBe(true);
         expect(field<HTMLInputElement>("confirmMove").checked).toBe(true);
         expect(field<HTMLSelectElement>("language").value).toBe("en");
+        expect(field<HTMLSelectElement>("baudRate").value).toBe("115200");
     });
 
     it("saves what was changed", () => {
@@ -30,8 +31,9 @@ describe("SettingsView", () => {
         field<HTMLInputElement>("clockSeconds").value = "45";
         field<HTMLInputElement>("hints").checked = false;
         field<HTMLSelectElement>("language").value = "ja";
+        field<HTMLSelectElement>("baudRate").value = "9600";
         root.querySelector<HTMLButtonElement>(".save")!.click();
-        expect(onSave).toHaveBeenCalledWith({ ...DEFAULT_SETTINGS, clockSeconds: 45, hints: false, language: "ja" });
+        expect(onSave).toHaveBeenCalledWith({ ...DEFAULT_SETTINGS, clockSeconds: 45, hints: false, language: "ja", baudRate: 9600 });
         expect(root.querySelector("dialog")!.open).toBe(false);
     });
 

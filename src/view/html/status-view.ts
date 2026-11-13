@@ -22,12 +22,15 @@ interface PlayerRow {
 export class StatusView {
     private readonly players: Record<Color, PlayerRow>;
     private readonly message: HTMLElement;
+    private readonly note: HTMLElement;
     private readonly passButton: HTMLButtonElement;
 
     constructor(root: HTMLElement, private readonly messages: Messages, handlers: StatusHandlers) {
         this.players = { [BLACK]: this.playerRow(root, "black"), [WHITE]: this.playerRow(root, "white") } as Record<Color, PlayerRow>;
         this.message = el("p", "message");
         this.message.setAttribute("aria-live", "polite");
+        this.note = el("p", "note");
+        this.note.hidden = true;
         const buttons = el("div", "buttons");
         this.passButton = el("button", "pass", messages.pass);
         this.passButton.type = "button";
@@ -37,7 +40,7 @@ export class StatusView {
         newGame.type = "button";
         newGame.addEventListener("click", () => handlers.onNewGame());
         buttons.append(this.passButton, newGame);
-        root.append(this.message, buttons);
+        root.append(this.message, this.note, buttons);
     }
 
     render(snapshot: Snapshot): void {
@@ -56,6 +59,12 @@ export class StatusView {
         if (alert) this.message.setAttribute("role", "alert");
         else this.message.removeAttribute("role");
         this.passButton.hidden = !snapshot.mustPass;
+    }
+
+    /** A note from the CPU link (e.g. a slow CPU); null hides it. */
+    setNote(text: string | null): void {
+        this.note.textContent = text ?? "";
+        this.note.hidden = text === null;
     }
 
     renderClocks(timeLeft: { readonly black: number; readonly white: number }, limitMs: number, running: Color | null): void {

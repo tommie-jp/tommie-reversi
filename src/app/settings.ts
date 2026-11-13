@@ -11,6 +11,8 @@ export interface Settings {
     /** Tap twice to send a move to the CPU (there is no take-back). */
     readonly confirmMove: boolean;
     readonly language: LanguageSetting;
+    /** For Web Serial. A Pico 2 on USB ignores it; a USB-UART bridge needs the CPU's rate. */
+    readonly baudRate: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -19,7 +21,10 @@ export const DEFAULT_SETTINGS: Settings = {
     hints: true,
     confirmMove: true,
     language: "auto",
+    baudRate: 115200,
 };
+
+export const BAUD_RATES: readonly number[] = [9600, 38400, 115200, 230400, 460800, 921600];
 
 export const MAX_CLOCK_SECONDS = 3600;
 const LANGUAGES: readonly LanguageSetting[] = ["auto", "ja", "en"];
@@ -31,6 +36,7 @@ export function parseSettings(raw: unknown): Settings {
         typeof value[key] === "boolean" ? (value[key] as boolean) : DEFAULT_SETTINGS[key];
     const seconds = value["clockSeconds"];
     const language = value["language"];
+    const baudRate = value["baudRate"];
     return {
         clockSeconds:
             Number.isInteger(seconds) && (seconds as number) >= 1 && (seconds as number) <= MAX_CLOCK_SECONDS
@@ -40,5 +46,6 @@ export function parseSettings(raw: unknown): Settings {
         hints: flag("hints"),
         confirmMove: flag("confirmMove"),
         language: LANGUAGES.includes(language as LanguageSetting) ? (language as LanguageSetting) : DEFAULT_SETTINGS.language,
+        baudRate: BAUD_RATES.includes(baudRate as number) ? (baudRate as number) : DEFAULT_SETTINGS.baudRate,
     };
 }

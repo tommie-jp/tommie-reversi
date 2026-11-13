@@ -107,6 +107,15 @@ describe("StatusView", () => {
         expect(black.classList.contains("running")).toBe(false);
     });
 
+    it("shows a note from the CPU link, and clears it", () => {
+        const { root, view } = setup();
+        view.setNote("the CPU has not moved for 90s (still waiting)");
+        expect(root.querySelector<HTMLElement>(".note")!.hidden).toBe(false);
+        expect(root.querySelector(".note")!.textContent).toBe("the CPU has not moved for 90s (still waiting)");
+        view.setNote(null);
+        expect(root.querySelector<HTMLElement>(".note")!.hidden).toBe(true);
+    });
+
     it("asks for a new game", () => {
         const { root, view, handlers } = setup();
         view.render(snapshot(newGame()));
