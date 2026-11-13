@@ -1,0 +1,6 @@
+{
+  // Tests of browser code (src/app, src/view/html): DOM types, no Node.
+  "extends": "./tsconfig.json",
+  "include": ["src", "test/app", "test/view/html", "test/helpers"],
+  "exclude": ["src/cli", "src/transport/node-serial.ts"]
+}

@@ -13,7 +13,7 @@
     "dev": "vite",
     "build": "npm run check && vite build",
     "preview": "vite preview",
-    "check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.core.json",
+    "check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web-test.json && tsc --noEmit -p tsconfig.core.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint:md": "npx --yes markdownlint-cli '*.md' 'docs/*.md'",
@@ -23,6 +23,7 @@
   "devDependencies": {
     "@types/node": "^22.20.5",
     "@vitest/coverage-v8": "4.1.12",
+    "happy-dom": "^21.0.4",
     "tsx": "^4.23.15",
     "typescript": "^6.0.2",
     "vite": "^8.0.7",
