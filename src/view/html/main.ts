@@ -37,7 +37,7 @@ function main(): void {
     sound.enabled = settings.sound;
     const screenLock = new ScreenLock();
     const alerts = new ClockAlerts(CLOCK_WARN_MS);
-    document.addEventListener("pointerdown", () => sound.unlock(), { once: true });
+    unlockOnGesture(sound);
 
     const header = topBar(messages);
     const layout = el("main", "layout");
@@ -152,6 +152,19 @@ function playSounds(previous: Snapshot | null, next: Snapshot, sound: Sound): vo
     if (previous === null || previous.gameNumber !== next.gameNumber) return;
     if (next.result !== null && previous.result === null) return sound.play("end");
     if (next.state.moves.length > previous.state.moves.length) sound.play("place");
+}
+
+/** Events that count as a user gesture for audio (a touch counts when lifted). */
+const GESTURES = ["pointerup", "touchend", "click", "keydown"] as const;
+
+/** Tries to start the audio on each gesture, and stops listening once it runs. */
+function unlockOnGesture(sound: Sound): void {
+    const onGesture = () => {
+        void sound.unlock().then((ready) => {
+            if (ready) for (const type of GESTURES) document.removeEventListener(type, onGesture, true);
+        });
+    };
+    for (const type of GESTURES) document.addEventListener(type, onGesture, true);
 }
 
 /** localStorage, or a store that keeps nothing when the browser refuses it. */

@@ -1,6 +1,7 @@
-// Short sounds made with Web Audio (no sound files). Browsers allow sound only after the
-// person has touched the page, so `unlock` is called on the first tap. Any failure is
-// ignored: the game goes on without sound.
+// Short sounds made with Web Audio (no sound files). Browsers allow sound only after a
+// user gesture, and a touch counts only when the finger is lifted (pointerup, touchend,
+// click), not when it lands (pointerdown). So `unlock` is tried on each gesture until the
+// audio is running. Any failure is ignored: the game goes on without sound.
 
 export type SoundKind = "place" | "end" | "warn" | "timeout";
 
@@ -23,13 +24,20 @@ export class Sound {
     enabled = true;
     private context: AudioContext | null = null;
 
-    unlock(): void {
+    /** True once sound can play. Call it from a user gesture; it is safe to call again. */
+    get ready(): boolean {
+        return this.context !== null && this.context.state === "running";
+    }
+
+    /** Creates or resumes the audio inside a user gesture. Resolves to `ready`. */
+    async unlock(): Promise<boolean> {
         try {
             this.context ??= new AudioContext();
-            if (this.context.state === "suspended") void this.context.resume();
+            if (this.context.state !== "running") await this.context.resume();
         } catch {
-            this.context = null;
+            // Not allowed yet; the next gesture tries again.
         }
+        return this.ready;
     }
 
     play(kind: SoundKind): void {
