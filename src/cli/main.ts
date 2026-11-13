@@ -68,7 +68,7 @@ async function play(options: PlayOptions): Promise<number> {
     try {
         serial = await openSerial(options.port, options.baud);
     } catch (error) {
-        process.stderr.write(`error: ${error instanceof Error ? error.message : String(error)}\n`);
+        process.stderr.write(`error: ${errorMessage(error)}\n`);
         return EXIT.connection;
     }
     const transport = tapTransport(serial, (direction, line) => {
@@ -82,7 +82,7 @@ async function play(options: PlayOptions): Promise<number> {
         cpu = player;
         return await withKeyboard(session, () => session.run());
     } catch (error) {
-        process.stderr.write(`error: ${error instanceof Error ? error.message : String(error)} from ${options.port}\n`);
+        process.stderr.write(`error: ${errorMessage(error)} from ${options.port}\n`);
         return EXIT.connection;
     } finally {
         await transport.close().catch(() => {});
@@ -125,6 +125,10 @@ async function withKeyboard(session: Session, run: () => Promise<number>): Promi
     }
 }
 
+function errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+}
+
 function version(): string {
     const text = readFileSync(new URL("../../package.json", import.meta.url), "utf8");
     const parsed: unknown = JSON.parse(text);
@@ -137,7 +141,7 @@ function version(): string {
 main().then(
     (code) => process.exit(code),
     (error: unknown) => {
-        process.stderr.write(`error: ${error instanceof Error ? error.message : String(error)}\n`);
+        process.stderr.write(`error: ${errorMessage(error)}\n`);
         process.exit(EXIT.connection);
     },
 );

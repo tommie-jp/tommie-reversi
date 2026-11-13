@@ -36,6 +36,7 @@ export interface SessionDeps {
 export const EXIT = { ok: 0, usage: 1, connection: 2, stopped: 3, interrupted: 130 } as const;
 
 type NextStep = "new" | "quit";
+type StopReason = NextStep | "interrupted";
 
 export class Session {
     readonly interaction: Interaction;
@@ -45,7 +46,7 @@ export class Session {
     private controller: AbortController | null = null;
     private files: GameFiles | null = null;
     private afterGame: ((step: NextStep) => void) | null = null;
-    private stopReason: "new" | "quit" | "interrupted" | null = null;
+    private stopReason: StopReason | null = null;
     private quitWhenIdle = false;
     private seats: Seats | null = null;
     /** RUP lines logged before the first game's files exist (the PI/VE of connecting). */
@@ -229,7 +230,7 @@ export class Session {
         });
     }
 
-    private stop(reason: "new" | "quit" | "interrupted"): void {
+    private stop(reason: StopReason): void {
         if (this.afterGame !== null) {
             this.afterGame(reason === "new" ? "new" : "quit");
             if (reason === "interrupted") this.stopReason = "interrupted";

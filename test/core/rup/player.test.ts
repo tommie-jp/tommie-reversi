@@ -137,8 +137,9 @@ describe("RupPlayer during a game", () => {
     it("stops on an error reply while waiting", async () => {
         const { player, reply } = setup();
         const waiting = player.requestMove(newGame());
+        const outcome = waiting.then(() => "resolved", (error: Error) => error.message);
         await reply("-04 bad coord");
-        await expect(waiting).rejects.toThrow("CPU error -04: bad coord");
+        expect(await outcome).toBe("CPU error -04: bad coord");
     });
 
     it("stops on an error reply that came before the next request", async () => {
@@ -206,8 +207,9 @@ describe("RupPlayer during a game", () => {
     it("stops when the connection closes", async () => {
         const { cpu, player } = setup();
         const waiting = player.requestMove(newGame());
+        const outcome = waiting.then(() => "resolved", (error: Error) => error.message);
         await cpu.close();
-        await expect(waiting).rejects.toThrow("disconnected: closed by the other end");
+        expect(await outcome).toBe("disconnected: closed by the other end");
         await expect(player.requestMove(newGame())).rejects.toThrow("disconnected");
     });
 
