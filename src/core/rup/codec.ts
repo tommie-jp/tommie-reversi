@@ -1,4 +1,5 @@
-// Reversi UART Protocol (RUP) v0.2: one line at a time, without the CR+LF line end.
+// Reversi UART Protocol (RUP) v0.2 and the v0.3 draft: one line at a time, without
+// the CR+LF line end.
 // https://github.com/tommie-jp/reversi-uart-protocol
 //
 // decode never throws. A line that breaks the rules becomes `invalid` with the RUP
@@ -18,7 +19,9 @@ export type RupOut =
     | { readonly type: "ED" }
     | { readonly type: "PI" }
     | { readonly type: "VE" }
-    | { readonly type: "CA" };
+    | { readonly type: "CA" }
+    /** An error reply to the CPU, e.g. `-05 illegal move a1`. */
+    | { readonly type: "-"; readonly code: string; readonly reason: string };
 
 /** Lines the CPU sends to the host. */
 export type RupIn =
@@ -64,6 +67,9 @@ export function encode(message: RupOut): string {
             return "MO" + message.square;
         case "BO":
             return "BO" + boardToBO(message.board);
+        case "-":
+            if (!/^\d{2}$/.test(message.code)) throw new RangeError(`not a RUP error code: ${message.code}`);
+            return `-${message.code}${message.reason === "" ? "" : ` ${message.reason}`}`;
         default:
             return message.type;
     }

@@ -1,17 +1,22 @@
-// A homebrew CPU on the other end of a transport, speaking RUP v0.2, seated as a Player.
+// A homebrew CPU on the other end of a transport, speaking RUP, seated as a Player.
+// Works with RUP v0.2 CPUs and follows the v0.3 draft on the host side.
 //
 //   connect()            PI (up to 3 tries, 1 s each), then VE
 //   start(black/white)   SB / SW, and PI every 3 s from then on
 //   opponentMoved()      MOxx / PA
 //   requestMove()        waits for MOxx / PA / EN
-//   finish(normal end)   EB / EW / ED (nothing is sent for a stopped game)
+//   finish()             normal end or resignation: EB / EW / ED
+//                        stopped game: ED, so the CPU goes back to idle (v0.3 draft)
+//                        the CPU broke the rules: -05 first (v0.3 draft)
+//
+// After the end of a game the host sends PI. Moves that arrive before the CPU's +PI
+// belong to the old game and are dropped, and the next game waits for that +PI
+// (v0.3 draft: a CPU answers PI at once, so +PI marks "nothing older is on the way").
+// A CPU that answers its last MO with PA can still be late by one line when the +PI
+// that ends the wait was an older one; one such PA is dropped as well.
 //
 // Other lines (BS, ST, NC, +XX, X*) are read past. An error reply `-NN` or a lost
 // connection stops the game. The match checks whether the CPU's moves are legal.
-//
-// When the last move of a game fills the board, the CPU (which does not judge the end
-// itself) may answer it with PA after EB/EW/ED has been sent. One such late PA is
-// dropped: the CPU's first move in a new game can never be a pass.
 
 import type { Color } from "../board";
 import { BLACK } from "../board";
@@ -29,7 +34,8 @@ export interface RupPlayerOptions {
     readonly onNotice: (text: string) => void;
 }
 
-export const RUP_VERSION = "02";
+export const RUP_VERSIONS: readonly string[] = ["02", "03"];
+const SETTLE_TRIES = 3;
 const REPLY_MS = 1_000;
 const CONNECT_TRIES = 3;
 const PING_INTERVAL_MS = 3_000;
@@ -54,6 +60,9 @@ export class RupPlayer implements Player {
     private missedPings = 0;
     /** A normal game just ended; a PA arriving before the CPU's next move is a late answer. */
     private latePassPossible = false;
+    private color: Color = BLACK;
+    /** Set after a game ends, until the CPU's +PI: moves arriving meanwhile are stale. */
+    private settling: Promise<void> | null = null;
 
     constructor(private readonly options: RupPlayerOptions) {
         options.transport.onLine((line) => this.receive(decode(line)));
@@ -72,14 +81,16 @@ export class RupPlayer implements Player {
             this.name = "unknown CPU";
             return { name: this.name, version: "" };
         }
-        if (ve.version !== RUP_VERSION) {
-            this.options.onNotice(`the CPU speaks RUP ${ve.version}; this app speaks RUP ${RUP_VERSION}`);
+        if (!RUP_VERSIONS.includes(ve.version)) {
+            this.options.onNotice(`the CPU speaks RUP ${ve.version}; this app speaks RUP ${RUP_VERSIONS.join(" and ")}`);
         }
         this.name = ve.name === "" ? "unnamed CPU" : ve.name;
         return { name: this.name, version: ve.version };
     }
 
     async start(color: Color): Promise<void> {
+        await this.settling;
+        this.color = color;
         this.cpuError = null;
         this.inbox.length = 0;
         await this.send({ type: color === BLACK ? "SB" : "SW" });
@@ -117,10 +128,23 @@ export class RupPlayer implements Player {
         this.stopHeartbeat();
         this.rejectWaiter(new Error("the game is over"));
         this.inbox.length = 0;
-        if (result.reason !== "normal") return;
-        this.latePassPossible = true;
-        const end = { black: "EB", white: "EW", draw: "ED" } as const;
-        await this.send({ type: end[result.outcome] });
+        if (this.disconnected !== null) return;
+        if (result.reason === "violation" && result.by === this.color) {
+            const tried = result.attempted.kind === "move" ? result.attempted.square : "PA";
+            await this.send({ type: "-", code: "05", reason: `illegal move ${tried}` }).catch(() => {});
+        }
+        this.latePassPossible = result.reason === "normal";
+        await this.send({ type: endLine(result) }).catch(() => {});
+        this.settling = this.settle();
+    }
+
+    /** Sends PI and drops moves until the CPU answers, or gives up after a few tries. */
+    private async settle(): Promise<void> {
+        for (let attempt = 0; attempt < SETTLE_TRIES; attempt++) {
+            if (this.disconnected !== null) break;
+            if ((await this.ask({ type: "PI" }, (m) => m.type === "+PI")) !== null) break;
+        }
+        this.settling = null;
     }
 
     private send(message: RupOut): Promise<void> {
@@ -149,16 +173,13 @@ export class RupPlayer implements Player {
         this.replyListener?.(message);
         switch (message.type) {
             case "MO":
-                this.latePassPossible = false;
-                return this.deliver({ kind: "move", square: message.square });
             case "PA":
-                if (this.latePassPossible) {
-                    this.latePassPossible = false;
-                    return this.options.onNotice("ignored a PA that arrived after the last game ended");
-                }
-                return this.deliver({ kind: "pass" });
             case "EN":
-                return this.deliver({ kind: "resign" });
+                if (this.settling !== null) {
+                    const line = message.type === "MO" ? `MO${message.square}` : message.type;
+                    return this.options.onNotice(`ignored ${line}: it arrived after the game ended`);
+                }
+                return this.receiveMove(message);
             case "-": {
                 const detail = `-${message.code}${message.reason ? `: ${message.reason}` : ""}`;
                 // While connecting, an error answers a query (e.g. VE not supported): not fatal.
@@ -175,6 +196,16 @@ export class RupPlayer implements Player {
             default:
                 return;
         }
+    }
+
+    private receiveMove(message: Extract<RupIn, { type: "MO" | "PA" | "EN" }>): void {
+        if (message.type === "PA" && this.latePassPossible) {
+            this.latePassPossible = false;
+            return this.options.onNotice("ignored a PA that arrived after the last game ended");
+        }
+        this.latePassPossible = false;
+        if (message.type === "MO") return this.deliver({ kind: "move", square: message.square });
+        return this.deliver({ kind: message.type === "PA" ? "pass" : "resign" });
     }
 
     private deliver(move: PlayerMove): void {
@@ -217,4 +248,11 @@ export class RupPlayer implements Player {
         };
         this.stopPing = this.options.timers.set(tick, PING_INTERVAL_MS);
     }
+}
+
+/** The end-of-game line for the CPU. A stopped game ends as a draw: RUP has no "abort" line yet. */
+function endLine(result: MatchResult): "EB" | "EW" | "ED" {
+    if (result.reason === "normal") return ({ black: "EB", white: "EW", draw: "ED" } as const)[result.outcome];
+    if (result.reason === "resign") return result.by === BLACK ? "EW" : "EB";
+    return "ED";
 }

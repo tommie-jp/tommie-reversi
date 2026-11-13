@@ -67,7 +67,7 @@ describe("RupPlayer.connect", () => {
             if (line === "VE") void cpu.sendLine("+VE01old");
         });
         await player.connect();
-        expect(notices).toContain("the CPU speaks RUP 01; this app speaks RUP 02");
+        expect(notices).toContain("the CPU speaks RUP 01; this app speaks RUP 02 and 03");
     });
 });
 
@@ -149,9 +149,11 @@ describe("RupPlayer during a game", () => {
     });
 
     it("forgets an error reply of the last game when a new game starts", async () => {
-        const { player, reply } = setup();
+        const { cpu, player, reply, autoAnswer } = setup();
+        autoAnswer(cpu);
         await reply("-05");
         await player.finish({ reason: "aborted", detail: "x" });
+        await settle();
         await player.start(BLACK);
         const waiting = player.requestMove(newGame());
         await reply("MOf5");
@@ -174,8 +176,10 @@ describe("RupPlayer during a game", () => {
 
     it("drops a PA that the CPU sends after the last game ended", async () => {
         // The last move filled the board; the CPU answers it with PA, which arrives late.
-        const { player, reply, notices } = setup();
+        const { cpu, player, reply, notices, autoAnswer } = setup();
+        autoAnswer(cpu);
         await player.finish({ reason: "normal", outcome: "draw" });
+        await settle();
         await player.start(WHITE);
         await reply("PA");
         const waiting = player.requestMove(newGame());
@@ -186,8 +190,10 @@ describe("RupPlayer during a game", () => {
     });
 
     it("drops only one late PA, and none once the CPU has moved", async () => {
-        const { player, reply } = setup();
+        const { cpu, player, reply, autoAnswer } = setup();
+        autoAnswer(cpu);
         await player.finish({ reason: "normal", outcome: "black" });
+        await settle();
         await player.start(BLACK);
         await reply("MOd3");
         expect(await player.requestMove(newGame())).toEqual({ kind: "move", square: "d3" });
@@ -260,18 +266,112 @@ describe("RupPlayer during a game", () => {
         ["black", "EB"],
         ["white", "EW"],
         ["draw", "ED"],
-    ] as const)("sends the end of a normal game: %s", async (outcome, line) => {
+    ] as const)("sends the end of a normal game, then PI to mark the end: %s", async (outcome, line) => {
         const { player, received } = setup();
         await player.finish({ reason: "normal", outcome });
         await settle();
-        expect(received).toEqual([line]);
+        expect(received).toEqual([line, "PI"]);
     });
 
-    it("sends nothing at the end of a stopped game, and stops the PI", async () => {
-        const { player, received, timers } = setup();
+    it("sends ED when a game is stopped, so the CPU goes back to idle (v0.3 draft)", async () => {
+        const { cpu, player, received, timers, autoAnswer } = setup();
+        autoAnswer(cpu);
         await player.start(BLACK);
         await player.finish({ reason: "aborted", detail: "quit" });
+        await settle();
+        expect(received).toEqual(["SB", "ED", "PI"]);
+        // The heartbeat is stopped: nothing more is sent afterwards.
         await timers.advance(10_000);
-        expect(received).toEqual(["SB"]);
+        expect(received).toEqual(["SB", "ED", "PI"]);
+    });
+
+    it("answers the CPU's illegal move with -05 before stopping (v0.3 draft)", async () => {
+        const { player, received } = setup();
+        await player.start(WHITE);
+        await player.finish({
+            reason: "violation", by: WHITE, attempted: { kind: "move", square: "a1" }, error: "no-flips",
+        });
+        await settle();
+        expect(received).toEqual(["SW", "-05 illegal move a1", "ED", "PI"]);
+    });
+
+    it("does not blame the CPU for the other player's violation", async () => {
+        const { player, received } = setup();
+        await player.start(WHITE);
+        await player.finish({
+            reason: "violation", by: BLACK, attempted: { kind: "pass" }, error: "pass-not-allowed",
+        });
+        await settle();
+        expect(received).toEqual(["SW", "ED", "PI"]);
+    });
+
+    it("tells the CPU who won when a player resigned", async () => {
+        const { player, received } = setup();
+        await player.finish({ reason: "resign", by: BLACK });
+        await settle();
+        expect(received).toEqual(["EW", "PI"]);
+    });
+
+    it("sends nothing at the end when the connection is lost", async () => {
+        const { cpu, player, received } = setup();
+        await cpu.close();
+        await player.finish({ reason: "aborted", detail: "disconnected" });
+        await settle();
+        expect(received).toEqual([]);
+    });
+
+    it("drops moves that arrive between the end of a game and the CPU's +PI", async () => {
+        const { cpu, player, reply, notices } = setup();
+        await player.start(BLACK);
+        await player.finish({ reason: "aborted", detail: "new game" });
+        // The CPU was still thinking: its old move comes first, then the answer to PI.
+        await reply("MOc4", "+PI");
+        const starting = player.start(WHITE);
+        await settle();
+        await starting;
+        const waiting = player.requestMove(newGame());
+        await reply("MOd6");
+        expect(await waiting).toEqual({ kind: "move", square: "d6" });
+        expect(notices).toEqual(["ignored MOc4: it arrived after the game ended"]);
+        void cpu;
+        await player.finish({ reason: "aborted", detail: "x" });
+    });
+
+    it("waits for the CPU's +PI before starting the next game", async () => {
+        const { player, reply, received } = setup();
+        await player.finish({ reason: "normal", outcome: "draw" });
+        let started = false;
+        const starting = player.start(BLACK).then(() => (started = true));
+        await settle();
+        expect(started).toBe(false);
+        expect(received).toEqual(["ED", "PI"]);
+        await reply("+PI");
+        await starting;
+        await settle();
+        expect(received).toEqual(["ED", "PI", "SB"]);
+        await player.finish({ reason: "aborted", detail: "x" });
+    });
+
+    it("starts the next game anyway when the CPU never answers the PI", async () => {
+        const { player, timers, received } = setup();
+        await player.finish({ reason: "normal", outcome: "draw" });
+        const starting = player.start(BLACK);
+        await timers.advance(3_000);
+        await starting;
+        await settle();
+        expect(received.at(-1)).toBe("SB");
+        await player.finish({ reason: "aborted", detail: "x" });
+    });
+
+    it("accepts RUP 02 and 03 without a warning", async () => {
+        for (const version of ["02", "03"]) {
+            const { cpu, player, notices } = setup();
+            cpu.onLine((line) => {
+                if (line === "PI") void cpu.sendLine("+PI");
+                if (line === "VE") void cpu.sendLine(`+VE${version}x`);
+            });
+            await player.connect();
+            expect(notices).toEqual([]);
+        }
     });
 });

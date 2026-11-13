@@ -17,8 +17,14 @@ describe("encode", () => {
         [{ type: "PI" }, "PI"],
         [{ type: "VE" }, "VE"],
         [{ type: "CA" }, "CA"],
+        [{ type: "-", code: "05", reason: "illegal move a1" }, "-05 illegal move a1"],
+        [{ type: "-", code: "05", reason: "" }, "-05"],
     ])("writes %j as %s", (message, line) => {
         expect(encode(message)).toBe(line);
+    });
+
+    it("refuses an error code that is not two digits", () => {
+        expect(() => encode({ type: "-", code: "5", reason: "" })).toThrow();
     });
 
     it("refuses a square that RUP does not allow", () => {

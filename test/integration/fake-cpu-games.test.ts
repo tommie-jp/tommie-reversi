@@ -68,7 +68,8 @@ describe("games against the fake RUP CPU", () => {
         const { player, lines } = await connectedCpu("illegal-move");
         const result = await play(player, new RandomPlayer("r", seededRandom(1)));
         expect(result).toMatchObject({ reason: "violation", by: 1, error: "no-flips" });
-        expect(lines.some((l) => /^TX E[BWD]$/.test(l))).toBe(false);
+        // v0.3 draft: the CPU is told about its illegal move, then sent back to idle.
+        expect(lines.filter((l) => /^TX (-05|E[BWD])/.test(l))).toEqual(["TX -05 illegal move a1", "TX ED"]);
     });
 
     it("stops with a rule violation when the CPU passes with a legal move", async () => {
