@@ -172,6 +172,31 @@ describe("RupPlayer during a game", () => {
         expect(notices[0]).toBe("the CPU answered -01: unknown command");
     });
 
+    it("drops a PA that the CPU sends after the last game ended", async () => {
+        // The last move filled the board; the CPU answers it with PA, which arrives late.
+        const { player, reply, notices } = setup();
+        await player.finish({ reason: "normal", outcome: "draw" });
+        await player.start(WHITE);
+        await reply("PA");
+        const waiting = player.requestMove(newGame());
+        await reply("MOd6");
+        expect(await waiting).toEqual({ kind: "move", square: "d6" });
+        expect(notices).toEqual(["ignored a PA that arrived after the last game ended"]);
+        await player.finish({ reason: "aborted", detail: "x" });
+    });
+
+    it("drops only one late PA, and none once the CPU has moved", async () => {
+        const { player, reply } = setup();
+        await player.finish({ reason: "normal", outcome: "black" });
+        await player.start(BLACK);
+        await reply("MOd3");
+        expect(await player.requestMove(newGame())).toEqual({ kind: "move", square: "d3" });
+        const waiting = player.requestMove(newGame());
+        await reply("PA");
+        expect(await waiting).toEqual({ kind: "pass" });
+        await player.finish({ reason: "aborted", detail: "x" });
+    });
+
     it("says when the CPU is slow, and still takes its move", async () => {
         const { player, reply, timers, notices } = setup();
         const waiting = player.requestMove(newGame());

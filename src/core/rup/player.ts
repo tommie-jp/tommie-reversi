@@ -8,6 +8,10 @@
 //
 // Other lines (BS, ST, NC, +XX, X*) are read past. An error reply `-NN` or a lost
 // connection stops the game. The match checks whether the CPU's moves are legal.
+//
+// When the last move of a game fills the board, the CPU (which does not judge the end
+// itself) may answer it with PA after EB/EW/ED has been sent. One such late PA is
+// dropped: the CPU's first move in a new game can never be a pass.
 
 import type { Color } from "../board";
 import { BLACK } from "../board";
@@ -48,6 +52,8 @@ export class RupPlayer implements Player {
     private replyListener: ((message: RupIn) => void) | null = null;
     private stopPing: (() => void) | null = null;
     private missedPings = 0;
+    /** A normal game just ended; a PA arriving before the CPU's next move is a late answer. */
+    private latePassPossible = false;
 
     constructor(private readonly options: RupPlayerOptions) {
         options.transport.onLine((line) => this.receive(decode(line)));
@@ -112,6 +118,7 @@ export class RupPlayer implements Player {
         this.rejectWaiter(new Error("the game is over"));
         this.inbox.length = 0;
         if (result.reason !== "normal") return;
+        this.latePassPossible = true;
         const end = { black: "EB", white: "EW", draw: "ED" } as const;
         await this.send({ type: end[result.outcome] });
     }
@@ -142,8 +149,13 @@ export class RupPlayer implements Player {
         this.replyListener?.(message);
         switch (message.type) {
             case "MO":
+                this.latePassPossible = false;
                 return this.deliver({ kind: "move", square: message.square });
             case "PA":
+                if (this.latePassPossible) {
+                    this.latePassPossible = false;
+                    return this.options.onNotice("ignored a PA that arrived after the last game ended");
+                }
                 return this.deliver({ kind: "pass" });
             case "EN":
                 return this.deliver({ kind: "resign" });

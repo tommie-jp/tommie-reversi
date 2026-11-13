@@ -49,6 +49,15 @@ describe("games against the fake RUP CPU", () => {
         }
     });
 
+    it("goes on to the next game when the CPU passes after the last move", async () => {
+        const { player } = await connectedCpu("pass-after-end");
+        for (let game = 1; game <= 20; game++) {
+            const random = new RandomPlayer("random", seededRandom(game));
+            const result = game % 2 === 1 ? await play(player, random) : await play(random, player);
+            expect(result.reason, `game ${game}`).toBe("normal");
+        }
+    });
+
     it("reads past the BS lines the current FPGA sends after its moves", async () => {
         const { player, notices } = await connectedCpu("board-after-move");
         expect((await play(player, new RandomPlayer("r", seededRandom(3)))).reason).toBe("normal");

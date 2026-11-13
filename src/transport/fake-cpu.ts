@@ -18,7 +18,9 @@ export type Misbehaviour =
     /** Sends a BS board line after every move, like the current FPGA. */
     | "board-after-move"
     /** Answers the host's first move with -04. */
-    | "error-reply";
+    | "error-reply"
+    /** Answers the last move of a game with PA, like the current FPGA does. */
+    | "pass-after-end";
 
 export interface FakeCpuOptions {
     readonly name: string;
@@ -42,6 +44,7 @@ export function startFakeCpu(transport: LineTransport, options: FakeCpuOptions):
     };
 
     const myMove = (): void => {
+        if (game !== null && game.status === "finished" && options.misbehave === "pass-after-end") return send("PA");
         if (game === null || game.status !== "playing" || game.turn !== color) return;
         if (options.misbehave === "silent") return;
         if (once("illegal-move")) return send("MOa1");
