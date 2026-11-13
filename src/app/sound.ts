@@ -1,67 +1,102 @@
-// Short sounds made with Web Audio (no sound files). Browsers allow sound only after a
-// user gesture, and a touch counts only when the finger is lifted (pointerup, touchend,
-// click), not when it lands (pointerdown). So `unlock` is tried on each gesture until the
-// audio is running. Any failure is ignored: the game goes on without sound.
+// The game's sounds, played the way tommieVoice plays audio:
+// - one <audio> element is made once and used for every sound (iOS allows later plays
+//   on an element whose first play started from a tap);
+// - the first play happens inside a tap (`unlock` plays a silent clip);
+// - a refused play is caught: an interrupted one (AbortError) is ignored, any other marks
+//   sound as blocked so the screen can ask for a tap. The game itself never waits for sound.
+// An <audio> element is also heard on iOS when the ring/silent switch is off, unlike Web Audio.
 
-export type SoundKind = "place" | "end" | "warn" | "timeout";
+import { TONES, renderWav, silentWav, type SoundKind } from "./tones";
 
-interface Tone {
-    readonly frequency: number;
-    readonly endFrequency?: number;
-    readonly start: number;
-    readonly length: number;
-    readonly volume: number;
+export type { SoundKind } from "./tones";
+
+/** The part of HTMLAudioElement that is used, so tests can pass a fake. */
+export interface AudioElement {
+    src: string;
+    currentTime: number;
+    preload: string;
+    play(): Promise<void>;
+    pause(): void;
 }
 
-const TONES: Record<SoundKind, readonly Tone[]> = {
-    place: [{ frequency: 800, endFrequency: 400, start: 0, length: 0.1, volume: 0.15 }],
-    end: [523, 659, 784].map((frequency, i) => ({ frequency, start: i * 0.15, length: 0.3, volume: 0.12 })),
-    warn: [0, 0.2].map((start) => ({ frequency: 880, start, length: 0.12, volume: 0.12 })),
-    timeout: [{ frequency: 440, start: 0, length: 0.7, volume: 0.15 }],
-};
+export interface SoundOptions {
+    readonly element: AudioElement;
+    /** Turns WAV bytes into a URL the element can play (a blob: URL in the browser). */
+    readonly makeUrl: (wav: Uint8Array) => string;
+    readonly onBlockedChange?: (blocked: boolean) => void;
+}
+
+const UNLOCK_CLIP_MS = 50;
 
 export class Sound {
     enabled = true;
-    private context: AudioContext | null = null;
+    private unlocked = false;
+    private isBlocked = false;
+    private readonly urls: Record<SoundKind, string>;
+    private readonly silence: string;
 
-    /** True once sound can play. Call it from a user gesture; it is safe to call again. */
-    get ready(): boolean {
-        return this.context !== null && this.context.state === "running";
+    constructor(private readonly options: SoundOptions) {
+        options.element.preload = "auto";
+        this.silence = options.makeUrl(silentWav(UNLOCK_CLIP_MS));
+        this.urls = {
+            place: options.makeUrl(renderWav(TONES.place)),
+            end: options.makeUrl(renderWav(TONES.end)),
+            warn: options.makeUrl(renderWav(TONES.warn)),
+            timeout: options.makeUrl(renderWav(TONES.timeout)),
+        };
     }
 
-    /** Creates or resumes the audio inside a user gesture. Resolves to `ready`. */
+    /** Sound has been allowed by a tap. */
+    get ready(): boolean {
+        return this.unlocked;
+    }
+
+    /** The browser refused the last play; a tap is needed. */
+    get blocked(): boolean {
+        return this.isBlocked;
+    }
+
+    /** Call from a tap. Plays a silent clip; resolves to `ready`. Safe to call again. */
     async unlock(): Promise<boolean> {
+        if (this.unlocked) return true;
         try {
-            this.context ??= new AudioContext();
-            if (this.context.state !== "running") await this.context.resume();
-        } catch {
-            // Not allowed yet; the next gesture tries again.
+            await this.start(this.silence);
+            this.unlocked = true;
+            this.setBlocked(false);
+        } catch (error) {
+            if (!isAbort(error)) this.setBlocked(true);
         }
-        return this.ready;
+        return this.unlocked;
     }
 
     play(kind: SoundKind): void {
-        const context = this.context;
-        if (!this.enabled || context === null) return;
+        if (!this.enabled || !this.unlocked) return;
+        this.start(this.urls[kind]).then(
+            () => this.setBlocked(false),
+            (error: unknown) => {
+                if (!isAbort(error)) this.setBlocked(true);
+            },
+        );
+    }
+
+    private start(url: string): Promise<void> {
+        const element = this.options.element;
+        element.src = url;
+        element.currentTime = 0;
         try {
-            const now = context.currentTime;
-            for (const tone of TONES[kind]) this.tone(context, now, tone);
-        } catch {
-            // No sound this time.
+            return element.play();
+        } catch (error) {
+            return Promise.reject(error);
         }
     }
 
-    private tone(context: AudioContext, now: number, tone: Tone): void {
-        const oscillator = context.createOscillator();
-        const gain = context.createGain();
-        const start = now + tone.start;
-        const end = start + tone.length;
-        oscillator.frequency.setValueAtTime(tone.frequency, start);
-        if (tone.endFrequency !== undefined) oscillator.frequency.exponentialRampToValueAtTime(tone.endFrequency, end);
-        gain.gain.setValueAtTime(tone.volume, start);
-        gain.gain.exponentialRampToValueAtTime(0.001, end);
-        oscillator.connect(gain).connect(context.destination);
-        oscillator.start(start);
-        oscillator.stop(end);
+    private setBlocked(blocked: boolean): void {
+        if (blocked === this.isBlocked) return;
+        this.isBlocked = blocked;
+        this.options.onBlockedChange?.(blocked);
     }
+}
+
+function isAbort(error: unknown): boolean {
+    return typeof error === "object" && error !== null && (error as { name?: unknown }).name === "AbortError";
 }

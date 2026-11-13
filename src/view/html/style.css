@@ -40,6 +40,14 @@ html, body {
 .version { color: var(--muted); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
 .commit { color: var(--muted); font-size: 0.7rem; opacity: 0.6; }
 .spacer { flex: 1; }
+.sound-note {
+  font-size: 0.8rem;
+  color: #222;
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.sound-note[hidden] { display: none; }
 .top-button {
   min-height: 36px;
   padding: 0 12px;

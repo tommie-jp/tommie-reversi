@@ -33,13 +33,17 @@ function main(): void {
     document.documentElement.lang = language;
     const messages = messagesFor(language);
 
-    const sound = new Sound();
+    const header = topBar(messages);
+    const sound = new Sound({
+        element: new Audio(),
+        makeUrl: (wav) => URL.createObjectURL(new Blob([wav as BlobPart], { type: "audio/wav" })),
+        onBlockedChange: (blocked) => (header.soundNote.hidden = !blocked || !sound.enabled),
+    });
     sound.enabled = settings.sound;
     const screenLock = new ScreenLock();
     const alerts = new ClockAlerts(CLOCK_WARN_MS);
     unlockOnGesture(sound);
 
-    const header = topBar(messages);
     const layout = el("main", "layout");
     const boardArea = el("section", "board-area");
     const side = el("section", "side");
@@ -83,6 +87,7 @@ function main(): void {
         if (!settingsStore.save(next)) window.alert(messages.saveFailed);
         if (reload) return window.location.reload();
         sound.enabled = next.sound;
+        header.soundNote.hidden = !(sound.enabled && sound.blocked);
         controller.setClockLimit(next.clockSeconds * 1000);
         if (latest !== null) render(latest);
     });
@@ -103,7 +108,14 @@ function main(): void {
     startLocal();
 }
 
-function topBar(messages: Messages): { bar: HTMLElement; records: HTMLButtonElement; settings: HTMLButtonElement } {
+interface TopBar {
+    readonly bar: HTMLElement;
+    readonly records: HTMLButtonElement;
+    readonly settings: HTMLButtonElement;
+    readonly soundNote: HTMLElement;
+}
+
+function topBar(messages: Messages): TopBar {
     const bar = el("header", "top-bar");
     const title = el("h1", "title", messages.title);
     const version = el("span", "version", `v${APP_VERSION}`);
@@ -113,8 +125,11 @@ function topBar(messages: Messages): { bar: HTMLElement; records: HTMLButtonElem
     const settings = el("button", "top-button", messages.settings);
     records.type = "button";
     settings.type = "button";
-    bar.append(title, version, commit, el("span", "spacer"), records, settings);
-    return { bar, records, settings };
+    const soundNote = el("span", "sound-note", messages.soundBlocked);
+    soundNote.hidden = true;
+    soundNote.setAttribute("role", "status");
+    bar.append(title, version, commit, el("span", "spacer"), soundNote, records, settings);
+    return { bar, records, settings, soundNote };
 }
 
 /** Two people taking turns at this screen. */
@@ -157,7 +172,7 @@ function playSounds(previous: Snapshot | null, next: Snapshot, sound: Sound): vo
 /** Events that count as a user gesture for audio (a touch counts when lifted). */
 const GESTURES = ["pointerup", "touchend", "click", "keydown"] as const;
 
-/** Tries to start the audio on each gesture, and stops listening once it runs. */
+/** Tries to allow sound on each gesture, and stops listening once it is allowed. */
 function unlockOnGesture(sound: Sound): void {
     const onGesture = () => {
         void sound.unlock().then((ready) => {

@@ -8,7 +8,7 @@ export default defineConfig({
             provider: "v8",
             include: ["src/**/*.ts"],
             // Thin wrappers around the terminal and the serial port are checked by hand.
-            exclude: ["src/cli/main.ts", "src/cli/human.ts", "src/transport/node-serial.ts", "src/view/html/main.ts", "src/vite-env.d.ts", "src/app/sound.ts", "src/view/html/wake-lock.ts", "src/view/html/build-info.ts"],
+            exclude: ["src/cli/main.ts", "src/cli/human.ts", "src/transport/node-serial.ts", "src/view/html/main.ts", "src/vite-env.d.ts", "src/view/html/wake-lock.ts", "src/view/html/build-info.ts"],
             thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 },
         },
     },

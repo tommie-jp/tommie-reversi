@@ -50,6 +50,7 @@ export interface Messages {
     readonly language: string;
     readonly languageAuto: string;
     readonly saveFailed: string;
+    readonly soundBlocked: string;
     readonly result: (result: MatchResult, counts: Counts) => string;
 }
 
@@ -82,6 +83,7 @@ const ja: Messages = {
     language: "言葉",
     languageAuto: "ブラウザに合わせる",
     saveFailed: "このブラウザには保存できません (プライベートモードなど)",
+    soundBlocked: "音を出すには、画面をタップしてください",
     gameError: (error, square) => {
         switch (error) {
             case "no-flips": return `${square} は 1 つも返せません`;
@@ -140,6 +142,7 @@ const en: Messages = {
     language: "Language",
     languageAuto: "Same as the browser",
     saveFailed: "This browser cannot save (private mode?)",
+    soundBlocked: "Tap the screen to turn on sound",
     gameError: (error, square) => {
         switch (error) {
             case "no-flips": return `${square} does not flip any disc`;
