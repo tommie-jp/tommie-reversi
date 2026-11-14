@@ -8,7 +8,8 @@ import { ManualTimers } from "../helpers/manual-timers";
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 5));
 
-function setup(options: { logLimit?: number } = {}) {
+function setup(options: { logLimit?: number; strategies?: readonly string[] } = {}) {
+    const { strategies, ...linkOptions } = options;
     let now = 0;
     const notices: string[] = [];
     let changes = 0;
@@ -17,13 +18,13 @@ function setup(options: { logLimit?: number } = {}) {
         now: () => (now += 1),
         onChange: () => changes++,
         onNotice: (text) => notices.push(text),
-        ...options,
+        ...linkOptions,
     });
     let cpuEnd: LineTransport | null = null;
     const open = async () => {
         const [host, cpu] = createLoopbackPair();
         cpuEnd = cpu;
-        startFakeCpu(cpu, { name: "fake-fpga", seed: 1 });
+        startFakeCpu(cpu, { name: "fake-fpga", seed: 1, ...(strategies === undefined ? {} : { strategies }) });
         return { transport: host, label: "2e8a:000a" };
     };
     return { link, notices, open, cpu: () => cpuEnd!, changes: () => changes };
@@ -117,5 +118,28 @@ describe("CpuLink", () => {
         await cpu().sendLine("MOD3");
         await settle();
         expect(notices).toEqual(['ignored a line that breaks RUP (-04): "MOD3"']);
+    });
+
+    it("shows the CPU's strategies (XS extension) and its current one", async () => {
+        const { link, open } = setup({ strategies: ["fake-lsb", "fake-max"] });
+        await link.connect(open);
+        expect(link.state).toEqual({
+            kind: "connected",
+            name: "fake-lsb",
+            version: "03",
+            port: "2e8a:000a",
+            strategies: [{ index: 0, name: "fake-lsb" }, { index: 1, name: "fake-max" }],
+            strategy: 0,
+        });
+    });
+
+    it("shows the CPU's new name once a chosen strategy is set at the start of a game", async () => {
+        const { link, open } = setup({ strategies: ["fake-lsb", "fake-max"] });
+        await link.connect(open);
+        const player = link.player!;
+        player.chooseStrategy(1);
+        await player.start(1);
+        expect(link.state).toMatchObject({ kind: "connected", name: "fake-max", strategy: 1 });
+        await player.finish({ reason: "aborted", detail: "x" });
     });
 });

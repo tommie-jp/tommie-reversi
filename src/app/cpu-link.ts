@@ -3,7 +3,7 @@
 // passed in (Web Serial in the browser, a loopback with a fake CPU in tests).
 
 import { formatLogLine, type Direction } from "../core/rup/log-format";
-import { RupPlayer } from "../core/rup/player";
+import { RupPlayer, type CpuStrategy } from "../core/rup/player";
 import type { Timers } from "../core/timers";
 import type { LineTransport } from "../core/transport";
 import { tapTransport } from "../transport/tap";
@@ -11,7 +11,15 @@ import { tapTransport } from "../transport/tap";
 export type LinkState =
     | { readonly kind: "idle" }
     | { readonly kind: "connecting" }
-    | { readonly kind: "connected"; readonly name: string; readonly version: string; readonly port: string }
+    | {
+          readonly kind: "connected";
+          readonly name: string;
+          readonly version: string;
+          readonly port: string;
+          /** The CPU's strategies (XS extension) and the current one, for a CPU that has them. */
+          readonly strategies?: readonly CpuStrategy[];
+          readonly strategy?: number;
+      }
     | { readonly kind: "lost"; readonly reason: string; readonly port: string }
     | { readonly kind: "failed"; readonly message: string };
 
@@ -80,12 +88,17 @@ export class CpuLink {
         }
         const transport = tapTransport(opened.transport, (direction, line) => this.record(direction, line));
         transport.onClose((reason) => this.onClosed(transport, reason, opened.label));
-        const player = new RupPlayer({ transport, timers: this.options.timers, onNotice: this.options.onNotice });
+        const player = new RupPlayer({
+            transport,
+            timers: this.options.timers,
+            onNotice: this.options.onNotice,
+            onIdentity: () => this.renamed(player),
+        });
         this.transport = transport;
         try {
-            const { name, version } = await player.connect();
+            const { version } = await player.connect();
             this.cpu = player;
-            this.set({ kind: "connected", name, version, port: opened.label });
+            this.set(connectedState(player, version, opened.label));
             return true;
         } catch (error) {
             await this.disconnect();
@@ -105,6 +118,13 @@ export class CpuLink {
         this.set({ kind: "idle" });
     }
 
+    /** The CPU took a new name (a new strategy was set): show it. */
+    private renamed(player: RupPlayer): void {
+        const state = this.current;
+        if (player !== this.cpu || state.kind !== "connected") return;
+        this.set(connectedState(player, state.version, state.port));
+    }
+
     private onClosed(transport: LineTransport, reason: string, port: string): void {
         if (this.closingOnPurpose || transport !== this.transport) return;
         this.transport = null;
@@ -122,6 +142,12 @@ export class CpuLink {
         this.current = state;
         this.options.onChange();
     }
+}
+
+function connectedState(player: RupPlayer, version: string, port: string): LinkState {
+    const base = { kind: "connected", name: player.name, version, port } as const;
+    if (player.strategies.length === 0 || player.strategy === null) return base;
+    return { ...base, strategies: player.strategies, strategy: player.strategy };
 }
 
 function messageOf(error: unknown): string {

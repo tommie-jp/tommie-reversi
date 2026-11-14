@@ -29,6 +29,12 @@ export interface FakeCpuOptions {
     readonly misbehave?: Misbehaviour;
     /** RUP version to act as. Default "03". */
     readonly version?: "02" | "03";
+    /**
+     * With names here, the CPU has the XS extension (like the FPGA Reversi): XS<n> picks
+     * strategy n outside a game, and VE answers with that strategy's name. It plays random
+     * moves whatever the strategy.
+     */
+    readonly strategies?: readonly string[];
 }
 
 const CAPABILITIES_V02 = "PI VE CA SB SW MO PA BO EB EW ED";
@@ -36,7 +42,10 @@ const CAPABILITIES_V02 = "PI VE CA SB SW MO PA BO EB EW ED";
 export function startFakeCpu(transport: LineTransport, options: FakeCpuOptions): void {
     const random = seededRandom(options.seed);
     const version = options.version ?? "03";
-    const capabilities = version === "03" ? `${CAPABILITIES_V02} EA` : CAPABILITIES_V02;
+    const strategies = options.strategies ?? [];
+    const base = version === "03" ? `${CAPABILITIES_V02} EA` : CAPABILITIES_V02;
+    const capabilities = strategies.length > 0 ? `${base} XS` : base;
+    let strategy = 0;
     let game: GameState | null = null;
     let color: Color = BLACK;
     let misbehaved = false;
@@ -85,13 +94,22 @@ export function startFakeCpu(transport: LineTransport, options: FakeCpuOptions):
         const command = line.slice(0, 2);
         switch (command) {
             case "PI": return send("+PI");
-            case "VE": return send(`+VE${version}${options.name}`);
+            case "VE": return send(`+VE${version}${strategies[strategy] ?? options.name}`);
             case "CA": return send(`+CA ${capabilities}`);
             case "SB": return start(BLACK);
             case "SW": return start(WHITE);
             case "MO":
             case "PA": return opponentMoved(line);
             case "BO": return;
+            case "XS": {
+                if (strategies.length === 0) return send("-01 unknown command");
+                if (line === "XS") return send(`+XS${strategy}`);
+                const n = /^XS(\d)$/.test(line) ? Number(line.slice(2)) : -1;
+                if (n < 0 || n >= strategies.length) return send("-00 bad arg");
+                if (game !== null) return send("-06 in game");
+                strategy = n;
+                return send(`+XS${n}`);
+            }
             case "EA":
                 if (version === "02") return send("-01 unknown command");
                 game = null;

@@ -22,6 +22,11 @@ export type RupOut =
     | { readonly type: "PI" }
     | { readonly type: "VE" }
     | { readonly type: "CA" }
+    /**
+     * The XS extension (an `X*` command, not RUP itself): `XS` asks for the CPU's strategy,
+     * `XS<n>` picks strategy n (0-9). Only for a CPU that lists XS in its +CA reply.
+     */
+    | { readonly type: "XS"; readonly index?: number }
     /** An error reply to the CPU, e.g. `-05 illegal move a1`. */
     | { readonly type: "-"; readonly code: string; readonly reason: string };
 
@@ -69,6 +74,12 @@ export function encode(message: RupOut): string {
             return "MO" + message.square;
         case "BO":
             return "BO" + boardToBO(message.board);
+        case "XS":
+            if (message.index === undefined) return "XS";
+            if (!Number.isInteger(message.index) || message.index < 0 || message.index > 9) {
+                throw new RangeError(`not an XS strategy number: ${message.index}`);
+            }
+            return "XS" + message.index;
         case "-":
             if (!/^\d{2}$/.test(message.code)) throw new RangeError(`not a RUP error code: ${message.code}`);
             return `-${message.code}${message.reason === "" ? "" : ` ${message.reason}`}`;

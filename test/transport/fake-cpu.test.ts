@@ -87,6 +87,26 @@ describe("startFakeCpu", () => {
         expect(got).toHaveLength(2);
     });
 
+    it("has the XS extension when given strategies: lists XS, names the strategy in VE", async () => {
+        const options = { strategies: ["fake-lsb", "fake-max", "fake-corner"] };
+        expect(await talk(options, ["CA", "XS", "VE", "XS2", "VE"])).toEqual([
+            "+CA PI VE CA SB SW MO PA BO EB EW ED EA XS",
+            "+XS0",
+            "+VE03fake-lsb",
+            "+XS2",
+            "+VE03fake-corner",
+        ]);
+    });
+
+    it("refuses XS<n> during a game and for a strategy it does not have", async () => {
+        const got = await talk({ strategies: ["a", "b"] }, ["XS5", "SW", "XS1", "ED", "XS1"]);
+        expect(got).toEqual(["-00 bad arg", "-06 in game", "+XS1"]);
+    });
+
+    it("does not know XS without strategies", async () => {
+        expect(await talk({}, ["XS"])).toEqual(["-01 unknown command"]);
+    });
+
     it("stops answering when the connection closes", async () => {
         const [host, cpu]: [LineTransport, LineTransport] = createLoopbackPair();
         startFakeCpu(cpu, { name: "fake", seed: 1 });

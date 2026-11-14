@@ -444,3 +444,117 @@ describe("RupPlayer during a game", () => {
         }
     });
 });
+
+/**
+ * A CPU with the XS extension (as the FPGA Reversi has): XS answers +XS<n> with the current
+ * strategy, XS<n> picks strategy n when no game is on, and VE names the current strategy.
+ */
+function strategyCpu(cpu: LineTransport, options: { names?: readonly string[]; current?: number; inGame?: boolean; ca?: string } = {}) {
+    const names = options.names ?? ["fpga-01-lsb", "fpga-02-max_gain", "fpga-03-corner"];
+    let current = options.current ?? 1;
+    let inGame = options.inGame ?? false;
+    const send = (line: string) => void cpu.sendLine(line);
+    cpu.onLine((line) => {
+        if (line === "PI") return send("+PI");
+        if (line === "VE") return send(`+VE02${names[current]}`);
+        if (line === "CA") return send(options.ca ?? "+CA PI VE CA SB SW MO PA EB EW ED XI XB XS");
+        if (line === "XS") return send(`+XS${current}`);
+        if (line === "SB" || line === "SW") inGame = true;
+        if (/^E[BWDA]$/.test(line)) inGame = false;
+        const pick = /^XS(\d)$/.exec(line);
+        if (pick === null) return;
+        const n = Number(pick[1]);
+        if (inGame) return send("-06 in game");
+        if (n >= names.length) return send("-00 bad arg");
+        current = n;
+        send(`+XS${n}`);
+    });
+    return { current: () => current };
+}
+
+describe("RupPlayer and the XS extension (choosing the CPU's strategy)", () => {
+    it("lists the strategies by name when the CPU lists XS, and leaves the CPU as it was", async () => {
+        const { cpu, player, received, notices } = setup();
+        const fpga = strategyCpu(cpu, { current: 1 });
+        await player.connect();
+        expect(player.strategies).toEqual([
+            { index: 0, name: "fpga-01-lsb" },
+            { index: 1, name: "fpga-02-max_gain" },
+            { index: 2, name: "fpga-03-corner" },
+        ]);
+        expect(player.strategy).toBe(1);
+        expect(player.name).toBe("fpga-02-max_gain");
+        expect(fpga.current()).toBe(1);
+        expect(received).toEqual([
+            "PI", "VE", "CA", "XS", "XS0", "VE", "XS1", "VE", "XS2", "VE", "XS3", "XS1",
+        ]);
+        expect(notices).toEqual([]);
+    });
+
+    it("does not send XS to a CPU that does not list it", async () => {
+        const { cpu, player, received } = setup();
+        strategyCpu(cpu, { ca: "+CA PI VE CA SB SW MO PA EB EW ED" });
+        await player.connect();
+        expect(player.strategies).toEqual([]);
+        expect(player.strategy).toBeNull();
+        expect(received).toEqual(["PI", "VE", "CA"]);
+    });
+
+    it("ends a game the CPU is still in (ED) before listing the strategies", async () => {
+        const { cpu, player, received } = setup();
+        strategyCpu(cpu, { inGame: true, current: 0 });
+        await player.connect();
+        expect(player.strategies.map((s) => s.index)).toEqual([0, 1, 2]);
+        expect(received.slice(3, 6)).toEqual(["XS", "XS0", "ED"]);
+    });
+
+    it("switches the CPU to the chosen strategy before the game starts", async () => {
+        const { cpu, player, received } = setup();
+        const fpga = strategyCpu(cpu, { current: 1 });
+        await player.connect();
+        received.length = 0;
+        player.chooseStrategy(2);
+        await player.start(BLACK);
+        expect(received).toEqual(["XS2", "VE", "SB"]);
+        expect(fpga.current()).toBe(2);
+        expect(player.strategy).toBe(2);
+        expect(player.name).toBe("fpga-03-corner");
+        await player.finish({ reason: "aborted", detail: "x" });
+    });
+
+    it("sends no XS when the chosen strategy is already the CPU's, or none was chosen", async () => {
+        const { cpu, player, received } = setup();
+        strategyCpu(cpu, { current: 1 });
+        await player.connect();
+        received.length = 0;
+        player.chooseStrategy(1);
+        await player.start(WHITE);
+        expect(received).toEqual(["SW"]);
+        await player.finish({ reason: "aborted", detail: "x" });
+    });
+
+    it("says so and plays on with the CPU's strategy when the CPU refuses XS", async () => {
+        const { cpu, player, received, notices } = setup();
+        strategyCpu(cpu, { current: 1, names: ["a", "b"] });
+        await player.connect();
+        received.length = 0;
+        player.chooseStrategy(5);
+        await player.start(BLACK);
+        expect(received).toEqual(["XS5", "SB"]);
+        expect(notices.at(-1)).toContain("XS5");
+        expect(player.strategy).toBe(1);
+        await player.finish({ reason: "aborted", detail: "x" });
+    });
+
+    it("tells its owner when the CPU's name changes", async () => {
+        const { host, cpu, timers } = setup();
+        const changed: string[] = [];
+        const player = new RupPlayer({ transport: host, timers, onNotice: () => {}, onIdentity: (name) => changed.push(name) });
+        strategyCpu(cpu, { current: 0 });
+        await player.connect();
+        player.chooseStrategy(2);
+        await player.start(BLACK);
+        expect(changed).toEqual(["fpga-03-corner"]);
+        await player.finish({ reason: "aborted", detail: "x" });
+    });
+});

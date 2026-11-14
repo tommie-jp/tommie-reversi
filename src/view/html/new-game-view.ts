@@ -1,4 +1,5 @@
-// The New game dialog: play a person or the CPU, the CPU's color, and the CPU connection.
+// The New game dialog: play a person or the CPU, the CPU's color, the CPU's strategy (for a
+// CPU with the XS extension), and the CPU connection.
 
 import { BLACK, WHITE, type Color } from "../../core/board";
 import type { LinkState } from "../../app/cpu-link";
@@ -20,6 +21,10 @@ export class NewGameView {
     private readonly radios: Record<Opponent, HTMLInputElement>;
     private readonly cpuOptions: HTMLElement;
     private readonly color: HTMLSelectElement;
+    private readonly strategyField: HTMLElement;
+    private readonly strategy: HTMLSelectElement;
+    /** The strategy chosen last ("" leaves it to the CPU), kept while the list is rebuilt. */
+    private chosenStrategy = "";
     private readonly linkState: HTMLElement;
     private readonly connectButton: HTMLButtonElement;
     private readonly disconnectButton: HTMLButtonElement;
@@ -45,6 +50,11 @@ export class NewGameView {
         }
         const colorField = el("label", "field");
         colorField.append(el("span", "field-label", m.cpuColor), this.color);
+        this.strategy = el("select", "");
+        this.strategy.name = "cpuStrategy";
+        this.strategy.addEventListener("change", () => (this.chosenStrategy = this.strategy.value));
+        this.strategyField = el("label", "field cpu-strategy");
+        this.strategyField.append(el("span", "field-label", m.cpuStrategy), this.strategy);
         this.linkState = el("p", "link-state");
         this.linkState.setAttribute("aria-live", "polite");
         this.connectButton = button("connect", m.connect, () => handlers.onConnect());
@@ -52,7 +62,7 @@ export class NewGameView {
         const linkButtons = el("div", "item-buttons");
         linkButtons.append(this.connectButton, this.disconnectButton);
         this.cpuOptions = el("div", "cpu-options");
-        this.cpuOptions.append(colorField, this.linkState, linkButtons);
+        this.cpuOptions.append(colorField, this.strategyField, this.linkState, linkButtons);
         this.startButton = button("start", m.start, () => this.start());
         body.append(opponents, this.unsupported, this.cpuOptions, this.startButton);
     }
@@ -65,6 +75,7 @@ export class NewGameView {
         const opponent: Opponent = canUseCpu ? choice.opponent : "person";
         this.radios[opponent].checked = true;
         this.color.value = String(choice.cpuColor);
+        this.chosenStrategy = choice.cpuStrategy === undefined ? "" : String(choice.cpuStrategy);
         this.update(link);
         openDialog(this.dialog);
     }
@@ -83,13 +94,31 @@ export class NewGameView {
         this.connectButton.disabled = this.link.kind === "connecting";
         this.disconnectButton.hidden = !connected;
         this.startButton.disabled = cpu && !connected;
+        this.showStrategies();
+    }
+
+    /** The strategy choice, shown only for a connected CPU that has strategies. */
+    private showStrategies(): void {
+        const strategies = this.link.kind === "connected" ? (this.link.strategies ?? []) : [];
+        this.strategyField.hidden = strategies.length === 0;
+        const keep = el("option", "", this.messages.cpuStrategyKeep);
+        keep.value = "";
+        const options = strategies.map((s) => {
+            const option = el("option", "", s.name);
+            option.value = String(s.index);
+            return option;
+        });
+        this.strategy.replaceChildren(keep, ...options);
+        const known = options.some((o) => o.value === this.chosenStrategy);
+        this.strategy.value = known ? this.chosenStrategy : "";
     }
 
     private start(): void {
         const opponent: Opponent = this.radios.cpu.checked ? "cpu" : "person";
         const cpuColor: Color = Number(this.color.value) === WHITE ? WHITE : BLACK;
+        const strategy = this.strategyField.hidden || this.strategy.value === "" ? null : Number(this.strategy.value);
         closeDialog(this.dialog);
-        this.handlers.onStart({ opponent, cpuColor });
+        this.handlers.onStart(strategy === null ? { opponent, cpuColor } : { opponent, cpuColor, cpuStrategy: strategy });
     }
 }
 

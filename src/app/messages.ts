@@ -57,6 +57,8 @@ export interface Messages {
     readonly opponentPerson: string;
     readonly opponentCpu: string;
     readonly cpuColor: string;
+    readonly cpuStrategy: string;
+    readonly cpuStrategyKeep: string;
     readonly cpuBlack: string;
     readonly cpuWhite: string;
     readonly connect: string;
@@ -105,6 +107,8 @@ const ja: Messages = {
     opponentPerson: "人",
     opponentCpu: "CPU (シリアル)",
     cpuColor: "CPU の色",
+    cpuStrategy: "CPU の方式",
+    cpuStrategyKeep: "CPU に任せる",
     cpuBlack: "黒 (先手)",
     cpuWhite: "白 (後手)",
     connect: "つなぐ",
@@ -190,6 +194,8 @@ const en: Messages = {
     opponentPerson: "Person",
     opponentCpu: "CPU (serial)",
     cpuColor: "CPU plays",
+    cpuStrategy: "CPU strategy",
+    cpuStrategyKeep: "Leave it to the CPU",
     cpuBlack: "Black (first)",
     cpuWhite: "White (second)",
     connect: "Connect",

@@ -74,4 +74,34 @@ describe("NewGameView", () => {
         expect(q(".unsupported").textContent).toContain("Web Serial");
         expect(q(".unsupported").hidden).toBe(false);
     });
+
+    it("offers the CPU's strategies (XS extension) and passes the chosen one on", () => {
+        const { view, q, choose, handlers } = setup();
+        const strategies = [{ index: 0, name: "fpga-01-lsb" }, { index: 1, name: "fpga-02-max_gain" }];
+        view.open({ opponent: "cpu", cpuColor: BLACK }, { ...CONNECTED, strategies, strategy: 0 }, "ok");
+        choose("cpu");
+        const select = q<HTMLSelectElement>('select[name="cpuStrategy"]');
+        expect(q(".cpu-strategy").hidden).toBe(false);
+        expect([...select.options].map((o) => o.textContent)).toEqual(["CPU に任せる", "fpga-01-lsb", "fpga-02-max_gain"]);
+        select.value = "1";
+        q<HTMLButtonElement>(".start").click();
+        expect(handlers.onStart).toHaveBeenCalledWith({ opponent: "cpu", cpuColor: BLACK, cpuStrategy: 1 });
+    });
+
+    it("keeps the last chosen strategy when opened again, and leaves it to the CPU by default", () => {
+        const { view, q } = setup();
+        const strategies = [{ index: 0, name: "a" }, { index: 1, name: "b" }];
+        view.open({ opponent: "cpu", cpuColor: BLACK, cpuStrategy: 1 }, { ...CONNECTED, strategies, strategy: 0 }, "ok");
+        expect(q<HTMLSelectElement>('select[name="cpuStrategy"]').value).toBe("1");
+        view.open({ opponent: "cpu", cpuColor: BLACK }, { ...CONNECTED, strategies, strategy: 0 }, "ok");
+        expect(q<HTMLSelectElement>('select[name="cpuStrategy"]').value).toBe("");
+    });
+
+    it("hides the strategy choice for a CPU without strategies", () => {
+        const { view, q, handlers } = setup();
+        view.open({ opponent: "cpu", cpuColor: BLACK }, CONNECTED, "ok");
+        expect(q(".cpu-strategy").hidden).toBe(true);
+        q<HTMLButtonElement>(".start").click();
+        expect(handlers.onStart).toHaveBeenCalledWith({ opponent: "cpu", cpuColor: BLACK });
+    });
 });

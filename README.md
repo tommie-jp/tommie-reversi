@@ -37,6 +37,9 @@ A debugging tool that runs on a PC with Node.js 22. Run `npm install` once, then
 - It works with RUP v0.2 CPUs and follows the v0.3 draft on the host side: a stopped game ends with `EA`
   (END ABORT; `ED` for a CPU whose `+CA` reply does not list `EA`) so the CPU goes back to idle, an illegal move is answered with `-05`, and after each game a `PI` / `+PI`
   exchange marks the point before which late moves are dropped.
+- A CPU whose `+CA` reply lists `XS` (an `X*` extension some CPUs have) can play more than one strategy.
+  On connecting, the app walks `XS0`, `XS1`, ... asking `VE` for each name, then puts the CPU back as it was;
+  the browser's New game dialog offers the strategies by name and sets the chosen one with `XS<n>` before the game.
 - Each game writes a record (`logs/<date>-<time>-<n>.txt`, `f5d6c3...` with no passes) and,
   with a CPU, a RUP log (`.rup.log`, `[HH:MM:SS.mmm] TX/RX line`, the replay format of the RUP tools).
 - Exit codes: 0 done, 1 bad options, 2 cannot connect, 3 a game was stopped, 130 Ctrl+C.

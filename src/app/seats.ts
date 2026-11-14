@@ -11,6 +11,8 @@ export interface GameChoice {
     readonly opponent: Opponent;
     /** The CPU's color, when the opponent is the CPU. */
     readonly cpuColor: Color;
+    /** The CPU's strategy (XS extension) to set before the game; absent leaves it to the CPU. */
+    readonly cpuStrategy?: number;
 }
 
 export interface SeatOptions {

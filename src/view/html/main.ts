@@ -88,6 +88,7 @@ function main(): void {
     });
     let choice: GameChoice = { opponent: "person", cpuColor: BLACK };
     const startGame = (next: GameChoice) => {
+        link.player?.chooseStrategy(next.cpuStrategy ?? null);
         const seats = buildSeats(next, {
             person: messages.person,
             cpu: link.player,

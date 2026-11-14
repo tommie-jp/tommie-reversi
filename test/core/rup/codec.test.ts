@@ -18,6 +18,8 @@ describe("encode", () => {
         [{ type: "PI" }, "PI"],
         [{ type: "VE" }, "VE"],
         [{ type: "CA" }, "CA"],
+        [{ type: "XS" }, "XS"],
+        [{ type: "XS", index: 2 }, "XS2"],
         [{ type: "-", code: "05", reason: "illegal move a1" }, "-05 illegal move a1"],
         [{ type: "-", code: "05", reason: "" }, "-05"],
     ])("writes %j as %s", (message, line) => {
@@ -26,6 +28,11 @@ describe("encode", () => {
 
     it("refuses an error code that is not two digits", () => {
         expect(() => encode({ type: "-", code: "5", reason: "" })).toThrow();
+    });
+
+    it("refuses an XS strategy number that is not one digit", () => {
+        expect(() => encode({ type: "XS", index: 10 })).toThrow();
+        expect(() => encode({ type: "XS", index: -1 })).toThrow();
     });
 
     it("refuses a square that RUP does not allow", () => {
